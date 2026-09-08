@@ -17,6 +17,7 @@ Caratteristiche:
 * Fogli **Arbitri** e **UdC** con conteggio automatico delle designazioni per ruolo e scala colore sul carico di lavoro.
 * Esportazione **iCalendar (.ics)** di tutte le gare, con girone o turno di playoff nel titolo dell'evento.
 * Parametri di campionato centralizzati in un unico punto: nome, loghi, stagione, punti vittoria/sconfitta/forfait e punteggio di forfait.
+* Foglio `Campionato` diviso in tre blocchi, ciascuno con la propria barra di intestazione colorata sopra: **PARAMETRI** (righe 2-10), **SQUADRE** (intestazioni in riga 13, dati 14-113) e **CAMPI** (intestazioni in riga 116, dati 117-225).
 * No macro e no VBA
 * Nessuna formula matriciale
 * Layout mutuato in gran parte da "Euro_2016.rar" con adattamento all'utilizzo di font liberi
@@ -56,15 +57,15 @@ Il confronto negli scontri diretti usa una colonna per ogni possibile avversaria
 Per passare da 10 a 11 squadre per girone, per ognuno dei cinque blocchi:
 
 1. **Inserire** una colonna *dentro* il blocco, per esempio prima dell'ultima (`AH`, `AT`, `BF`, `BR`, `CD`). Inserendola all'interno e non in coda, i riferimenti `SUM(...)` e `COUNT(...)` che leggono il blocco si allargano da soli.
-2. Copiare in tutta la colonna nuova la formula della colonna a fianco, dalla riga 12 fino all'ultima riga della tabella squadre.
-3. Nel blocco delle avversarie (`Y`-`AH`) correggere il numero nella formula: ogni colonna cerca `$E12&"#1"`, `$E12&"#2"` e così via, quindi la nuova colonna deve avere il progressivo che le compete e l'ultima va rinumerata. Nei quattro blocchi delle matrici non c'è nulla da rinumerare: ogni cella punta già alla colonna corrispondente del blocco avversarie.
-4. Aggiornare l'intestazione in riga 11 (`1^`, `2^`, ... ) per coerenza visiva.
+2. Copiare in tutta la colonna nuova la formula della colonna a fianco, dalla riga 14 fino all'ultima riga della tabella squadre.
+3. Nel blocco delle avversarie (`Y`-`AH`) correggere il numero nella formula: ogni colonna cerca `$E14&"#1"`, `$E14&"#2"` e così via, quindi la nuova colonna deve avere il progressivo che le compete e l'ultima va rinumerata. Nei quattro blocchi delle matrici non c'è nulla da rinumerare: ogni cella punta già alla colonna corrispondente del blocco avversarie.
+4. Aggiornare l'intestazione in riga 13 (`1^`, `2^`, ... ) per coerenza visiva.
 
 Se invece si aggiunge la colonna **in coda** al blocco, vanno corretti a mano gli intervalli nelle formule che li sommano: colonna `I` (coefficiente di ordinamento), `U` (record scontri diretti), `V` (quoziente scontri diretti) e `W` (quoziente totale), tutte nella tabella classifica.
 
 ### Più di 100 squadre o più di 10 gironi
 
-1. Inserire le righe necessarie **dentro** la tabella squadre (non dopo l'ultima), così gli intervalli si estendono da soli, e copiarvi le formule delle colonne `G`-`X` e dei blocchi delle matrici.
+1. Inserire le righe necessarie **dentro** la tabella squadre (righe 14-113, non dopo l'ultima), così gli intervalli si estendono da soli, e copiarvi le formule delle colonne `G`-`X` e dei blocchi delle matrici.
 2. Verificare i nomi definiti `areaNomiSquadre`, `areaCercaPuntiClassificaSquadra`, `areaCercaDatiPerPosizioneSquadre` e `areaCoefficienteSquadre`, che devono coprire tutte le righe squadra.
 3. Per un girone in più: duplicare un foglio `Calendario`, rinominarlo con la lettera nuova, assegnargli un colore, e aggiungere le sue righe in coda al foglio nascosto `Dati` con i riferimenti al nuovo foglio. Estendere poi l'intervallo `Dati!$A$2:$N$451` in tutte le formule che lo usano.
 4. Aggiungere il blocco corrispondente nel foglio `Classifica`.
