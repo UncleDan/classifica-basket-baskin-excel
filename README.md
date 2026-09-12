@@ -69,6 +69,7 @@ Nei fogli `Calendario A`-`J` e `Playoff`:
 
 * I file vengono distribuiti **senza valori in cache**: Excel, LibreOffice Calc e Google Sheets ricalcolano tutto all'apertura. Sull'esempio, con 466 gare, il primo calcolo può richiedere qualche secondo.
 * I fogli operativi hanno area di stampa, righe di intestazione ripetute e adattamento in larghezza a una pagina. `Calendario.ics` stampa solo l'intestazione, perché serve al copia-incolla e non alla carta.
+* Il nome squadra si scrive come `Nome-Città PR`: nei calendari e nel tabellone compare solo la parte prima del trattino. Se il trattino manca viene usato il nome per intero, quindi la convenzione è consigliata ma non obbligatoria.
 * I codici campo `PO1`-`PO8` identificano i campi neutri della fase a eliminazione diretta; `TBD` è il segnaposto per un campo non ancora definito, evidenziato in verde.
 
 Limitazioni:
