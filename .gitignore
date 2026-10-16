@@ -1,1 +1,19 @@
+# PDF
 *.pdf
+
+# File temporanei e di blocco di Microsoft Excel (da Excel 97 a Microsoft 365)
+~$*
+~*.tmp
+*.tmp
+*.xlk
+*.xar
+*.asd
+*.xlsx.tmp
+*.xls.tmp
+Backup of *.xlk
+AutoRecovery save of *
+
+# File di blocco e di backup di LibreOffice Calc
+.~lock.*#
+*.bak
+*.orig
