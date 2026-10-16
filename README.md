@@ -8,7 +8,7 @@ Caratteristiche:
 * Il girone di una squadra dipende **solo dalla lettera in colonna E**, non dalla riga in cui la squadra si trova: spostare una squadra di girone significa cambiare quella lettera. Classifiche, spareggi e posizioni si riallineano da sole; restano da sistemare a mano il calendario (chi incontra chi) e i colori delle righe.
 * **Gironi A-H competitivi**, le cui prime due classificate accedono ai playoff, e **gironi I-J non competitivi**, che hanno calendario e classifica ma restano fuori dalla fase finale. Il tabellone resta quindi a 16 squadre.
 * Un foglio nascosto `Dati` consolida in un unico blocco le righe di servizio dei dieci calendari: tutte le formule di classifica cercano lì per nome squadra, e nessuna dipende dalla posizione nel foglio.
-* Un **foglio calendario per girone** (`Calendario A` ... `Calendario J`), ciascuno con un colore identificativo riportato su linguetta, intestazioni di giornata e righe di classifica. Calendario di sola andata: 9 giornate da 5 gare, 45 gare per girone, 450 in totale.
+* Un **foglio calendario per girone** (`Calendario A` ... `Calendario J`), ciascuno con un colore identificativo riportato su linguetta, intestazioni di giornata e righe di classifica. I primi quattro gironi hanno i colori dei metalli: **A oro (Gold), B argento (Silver), C bronzo (Bronze), D platino (Platinum)**; E-J mantengono i propri colori. Nel file ESEMPIO la cella `D11` contiene `Gold,Silver,Bronze,Platinum`, quindi i calendari dei gironi A-D stampano `GIRONE GOLD`, `GIRONE SILVER`, `GIRONE BRONZE`, `GIRONE PLATINUM`; nel MODELLO `D11` è vuota. Calendario di sola andata: 9 giornate da 5 gare, 45 gare per girone, 450 in totale.
 * Classifica secondo i criteri del regolamento **Baskin** per gironi "round robin": **3 punti classifica per ciascuna partita vinta**, **1 punto classifica per ciascuna partita persa** e **0 punti classifica per le partite perse per forfait** (identificate dal risultato 40-0 o 0-40, valore comunque parametrico); risoluzione delle parità, nell'ordine, con i criteri *Maggior numero di vittorie nelle gare tra di loro*, *Più alto quoziente canestri nelle gare tra di loro*, *Più alto quoziente canestri in tutte le gare del girone*. Come criterio residuo, per garantire sempre un ordinamento univoco, l'ordine alfabetico.
 * I tre criteri di spareggio **compaiono solo quando servono davvero**: se la parità si risolve con gli scontri diretti si vede solo quella colonna, se serve il quoziente negli scontri diretti se ne vedono due, e solo arrivando al quoziente totale se ne vedono tre. Le squadre non appaiate mostrano `-` su tutte e tre.
 * Eventuali **punti di penalizzazione** per squadra, sottratti automaticamente in classifica.
@@ -18,7 +18,9 @@ Caratteristiche:
 * Fogli **Arbitri** e **UdC** con conteggio automatico delle designazioni per ruolo e scala colore sul carico di lavoro.
 * Esportazione **iCalendar (.ics)** di tutte le gare, con girone o turno di playoff nel titolo dell'evento.
 * Parametri di campionato centralizzati in un unico punto: nome, loghi, stagione, punti vittoria/sconfitta/forfait e punteggio di forfait. I gironi si elencano **separati da virgola** (`A,B,C,D,...`), così da poter usare anche lettere non consecutive; la colonna `Girone` della tabella squadre ha un elenco a discesa con le stesse lettere.
-* Foglio `Campionato` diviso in tre blocchi, ciascuno con la propria barra di intestazione colorata sopra: **PARAMETRI** (righe 2-10), **SQUADRE** (intestazioni in riga 13, dati 14-113) e **CAMPI** (intestazioni in riga 116, dati 117-225).
+* **Nomi dei gironi per la stampa**: nella cella `D11` si possono indicare, separati da virgola e nello stesso ordine dei gironi, i nomi da mostrare sulle intestazioni dei calendari. Esempio: con `A,B,C` in `D5` e `Silver, Gold, Platinum` in `D11`, i fogli restano `Calendario A`, `Calendario B`, `Calendario C` (e lettere e formule non cambiano), ma in stampa compaiono `GIRONE SILVER`, `GIRONE GOLD`, `GIRONE PLATINUM`, sia nel titolo di pagina sia nelle intestazioni di giornata. Se `D11` è vuota, o manca il nome di un girone, resta la lettera. Il nome vale solo per i calendari: classifiche, playoff, `Calendario.ics` e il resto del file continuano a usare la lettera.
+* **Loghi**: i due link (URL pubblico di un'immagine) si scrivono in `Campionato!D3` e `D4`; compaiono tramite `IMAGE()` nelle intestazioni dei fogli. Logo 1 / logo 2: in `Calendario A`-`J`, `Playoff` e `DESIGNAZIONI` nelle celle unite `E1:G3` e `I1:L3`; in `Classifica` in `J1:K3` e `L1:M3`; in `Classifica Finale` nelle celle unite `D1:D3` ed `E1:E3` (colonne `D` ed `E` larghe 20, come `E1:G3` dei calendari; celle `C`-`E` unite dalla riga 6 alla 106). Le righe 1-3 hanno la stessa altezza in tutti questi fogli. Se i link sono vuoti non si vede nulla.
+* Foglio `Campionato` diviso in tre blocchi, ciascuno con la propria barra di intestazione colorata sopra: **PARAMETRI** (righe 2-11), **SQUADRE** (intestazioni in riga 13, dati 14-113) e **CAMPI** (intestazioni in riga 116, dati 117-225).
 * No macro e no VBA
 * Nessuna formula matriciale
 * Layout mutuato in gran parte da "Euro_2016.rar" con adattamento all'utilizzo di font liberi
@@ -38,10 +40,11 @@ Il progetto comprende due file:
 | `Calendario A` … `Calendario J` | Una scheda per girone: 9 giornate da 5 gare, numerate in sequenza continua da 1 a 450 |
 | `Playoff` | Ottavi, quarti, semifinali e le due finali; gare 451-466 |
 | `Classifica` | Le dieci classifiche di girone, in blocchi colorati |
-| `Classifica Finale` | Ordine dalla 1ª alla 100ª posizione |
+| `Classifica Finale` | Ordine dalla 1ª alla 100ª posizione (colonne `C`-`E` unite per far spazio ai loghi) |
 | `DESIGNAZIONI` | Tutte le 466 gare con arbitri e ufficiali di campo |
 | `Arbitri`, `UdC` | Anagrafiche da 100 righe ciascuna, con conteggio delle designazioni per ruolo |
 | `MEMO` | Note operative del file |
+| `REGOLAMENTO` | In fondo: le pagine del regolamento, solo per riferimento (due immagini) |
 | `Calendario.ics` | Righe pronte per l'esportazione iCalendar |
 | `Dati` | **Nascosto.** Consolida in 450 righe le colonne di servizio dei dieci calendari |
 
@@ -64,6 +67,8 @@ Nei fogli `Calendario A`-`J` e `Playoff`:
 |---|---|
 | `M`-`AB` | Scomposizione di ogni risultato (squadra, vinta, persa, forfait, punti fatti e subiti, vincente e perdente). Il foglio `Dati` le raccoglie tutte e le classifiche leggono da lì |
 | `AC` | Etichetta del turno (`[Girone A]`, `[Ottavi]`, `[Finale 1-2]` …), ricavata con formule e usata dal foglio `Calendario.ics` |
+
+Solo nei fogli `Calendario A`-`J`, celle `M3`, `N3` e `O3` (etichette in riga 2): lettera del girone, sua posizione nell'elenco `D5` e nome per la stampa letto da `D11` (la lettera stessa se il nome manca). `A3` e le intestazioni di giornata leggono `O3`.
 
 ### Note pratiche
 
