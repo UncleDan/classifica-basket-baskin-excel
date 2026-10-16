@@ -18,7 +18,8 @@ Caratteristiche:
 * Fogli **Arbitri** e **UdC** con conteggio automatico delle designazioni per ruolo e scala colore sul carico di lavoro.
 * Esportazione **iCalendar (.ics)** di tutte le gare, con girone o turno di playoff nel titolo dell'evento.
 * Parametri di campionato centralizzati in un unico punto: nome, loghi, stagione, punti vittoria/sconfitta/forfait e punteggio di forfait. I gironi si elencano **separati da virgola** (`A,B,C,D,...`), così da poter usare anche lettere non consecutive; la colonna `Girone` della tabella squadre ha un elenco a discesa con le stesse lettere.
-* Foglio `Campionato` diviso in tre blocchi, ciascuno con la propria barra di intestazione colorata sopra: **PARAMETRI** (righe 2-10), **SQUADRE** (intestazioni in riga 13, dati 14-113) e **CAMPI** (intestazioni in riga 116, dati 117-225).
+* **Nomi dei gironi per la stampa**: nella cella `D11` si possono indicare, separati da virgola e nello stesso ordine dei gironi, i nomi da mostrare sulle intestazioni dei calendari. Esempio: con `A,B,C` in `D5` e `Silver, Gold, Platinum` in `D11`, i fogli restano `Calendario A`, `Calendario B`, `Calendario C` (e lettere e formule non cambiano), ma in stampa compaiono `GIRONE SILVER`, `GIRONE GOLD`, `GIRONE PLATINUM`, sia nel titolo di pagina sia nelle intestazioni di giornata. Se `D11` è vuota, o manca il nome di un girone, resta la lettera. Il nome vale solo per i calendari: classifiche, playoff, `Calendario.ics` e il resto del file continuano a usare la lettera.
+* Foglio `Campionato` diviso in tre blocchi, ciascuno con la propria barra di intestazione colorata sopra: **PARAMETRI** (righe 2-11), **SQUADRE** (intestazioni in riga 13, dati 14-113) e **CAMPI** (intestazioni in riga 116, dati 117-225).
 * No macro e no VBA
 * Nessuna formula matriciale
 * Layout mutuato in gran parte da "Euro_2016.rar" con adattamento all'utilizzo di font liberi
@@ -64,6 +65,8 @@ Nei fogli `Calendario A`-`J` e `Playoff`:
 |---|---|
 | `M`-`AB` | Scomposizione di ogni risultato (squadra, vinta, persa, forfait, punti fatti e subiti, vincente e perdente). Il foglio `Dati` le raccoglie tutte e le classifiche leggono da lì |
 | `AC` | Etichetta del turno (`[Girone A]`, `[Ottavi]`, `[Finale 1-2]` …), ricavata con formule e usata dal foglio `Calendario.ics` |
+
+Solo nei fogli `Calendario A`-`J`, celle `M3`, `N3` e `O3` (etichette in riga 2): lettera del girone, sua posizione nell'elenco `D5` e nome per la stampa letto da `D11` (la lettera stessa se il nome manca). `A3` e le intestazioni di giornata leggono `O3`.
 
 ### Note pratiche
 
