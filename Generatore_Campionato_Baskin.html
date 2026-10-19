@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.3 - 2026-10-19 13-00-56 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.4 - 2026-10-19 13-21-42 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -60,6 +60,8 @@ code{font:13px ui-monospace,Consolas,monospace}
 <p class="hint">Un girone per riga: <code>nome, squadre, colore</code>. Il nome va in D11 per la stampa; le lettere A, B, C… sono assegnate in ordine (massimo 26 gironi). Squadre da 3 a 40 (con un numero dispari ogni giornata una squadra riposa). Colore: nome HTML (green, red, navy, teal…), codice #RRGGBB, oppure gold, silver, bronze, platinum.</p>
 <textarea id="gironi" spellcheck="false">Gold, 10, gold</textarea>
 <div id="prev"></div>
+<label style="display:block;margin-top:10px">Calendari unificati (facoltativo)<input id="uni" type="text" value="" placeholder="es. A,B oppure A-B; C-D"></label>
+<p class="hint">Gironi che condividono un unico foglio calendario, con le giornate alternate (1A, 1B, 2A, 2B…), come il foglio "Calendario O-E". Gruppi separati da <code>;</code>, gironi del gruppo separati da <code>,</code> (oppure intervallo <code>A-D</code>). Vuoto = un foglio per girone.</p>
 </section>
 <section class="card">
 <h2>Parametri</h2>
@@ -339,12 +341,37 @@ async function generate(opt) {
   // dimensioni per girone
   const NGk = NTS.map(n => Math.floor(n / 2)), NRk = NTS.map(n => n % 2 ? n : n - 1), GPGk = NTS.map((n, k) => NGk[k] * NRk[k]);
   const PITk = NGk.map(g => 1 + g * 3 + 1), CALk = NRk.map((r, k) => 8 + PITk[k] * r - 1);
-  const GOFF = []; { let a = 0; for (let k = 0; k < G; k++) { GOFF.push(a); a += GPGk[k]; } }
+  // calendari: un foglio per girone, oppure un foglio unico per i gruppi indicati (giornate alternate)
+  const UNI = [];
+  { const used = {};
+    for (const line of String(C.uni || '').toUpperCase().split(/[\n;|]+/)) {
+      let g = line.split(/[,\s+\/]+/).filter(Boolean), mem = [];
+      for (const x of g) { if (/^[A-Z]-[A-Z]$/.test(x)) { const [a, b] = x.split('-'); for (const L of LET) if (L >= a && L <= b) mem.push(L); } else mem.push(x); }
+      mem = [...new Set(mem)]; if (!mem.length) continue;
+      for (const L of mem) { if (!LET.includes(L)) throw new Error('Calendari unificati: il girone ' + L + ' non esiste.'); if (used[L]) throw new Error('Calendari unificati: il girone ' + L + ' compare in due gruppi.'); used[L] = 1; }
+      if (mem.length < 2) throw new Error('Calendari unificati: ogni gruppo deve avere almeno 2 gironi (' + line.trim() + ').');
+      UNI.push(mem.map(L => LET.indexOf(L)).sort((a, b) => a - b));
+    } }
+  const CSH = [];   // fogli calendario: { name, mem, blocks:[{k,b,base}], last }
+  { const inU = {}; UNI.forEach(m => m.forEach(k => inU[k] = m));
+    for (let k = 0; k < G; k++) {
+      const m = inU[k]; if (m && m[0] !== k) continue;
+      const mem = m || [k], Ls = mem.map(i => LET[i]);
+      const contig = mem.every((x, i) => i === 0 || x === mem[i - 1] + 1);
+      let name = 'Calendario ' + (mem.length === 1 ? Ls[0] : contig ? Ls[0] + '-' + Ls[Ls.length - 1] : Ls.join(','));
+      const blocks = []; let cur = 8;
+      for (let b = 0; b < Math.max(...mem.map(i => NRk[i])); b++) for (const i of mem) if (b < NRk[i]) { blocks.push({ k: i, b, base: cur }); cur += PITk[i]; }
+      CSH.push({ name, mem, blocks, last: cur - 1 });
+    } }
+  const SHK = [], BASE = NTS.map(() => []);
+  CSH.forEach((c, si) => { c.mem.forEach(k => SHK[k] = si); c.blocks.forEach(o => BASE[o.k][o.b] = o.base); });
+  const GOFF = []; { let a = 0; for (const c of CSH) { c.goff = a; for (const k of c.mem) a += GPGk[k]; } }
   const GTOT = GPGk.reduce((a, b) => a + b, 0);
   const TOTT = NTS.reduce((a, b) => a + b, 0);
   const TS = []; { let a = 0; for (let k = 0; k < G; k++) { TS.push(a); a += NTS[k]; } }
   const T1 = 14, T2 = T1 + TOTT - 1, F1 = T2 + 4, F2 = F1 + TOTT - 1, NPO = 8, PO1 = F2 + 1, TBDR = PO1 + NPO;
-  const DOFF = []; { let a = 0; for (let k = 0; k < G; k++) { DOFF.push(a); a += CALk[k] + 25; } }
+  let DESEND = 0; for (const c of CSH) { c.doff = DESEND; DESEND += c.last + 25; }
+  const DOFF = NTS.map((_, k) => CSH[SHK[k]].doff);
   const DATI_LAST = GTOT + 1;
   const TPL_POFF = 185;   // offset righe playoff in DESIGNAZIONI nel modello 1x10
   const st = Styles(BP.styles);
@@ -375,7 +402,7 @@ async function generate(opt) {
   function mergesRowSingle(tname, sr, sh, dr) {
     for (const [c1, ra, c2, rb] of MER[tname]) if (ra === sr && rb === sr) sh.merge(CL(c1) + dr + ':' + CL(c2) + dr);
   }
-  const calname = L => 'Calendario ' + L;
+  const calname = L => CSH[SHK[LET.indexOf(L)]].name;
   const sheets = [];
   const mk = (name, tname) => { const sh = new Sheet(name, S[tname]); sheets.push(sh); return sh; };
 
@@ -461,25 +488,33 @@ async function generate(opt) {
   { const [attrs] = S['Campionato'].dv[0]; ws.dv.push('<dataValidation sqref="E' + T1 + ':E' + T2 + '"' + attrs + '><formula1>"' + LET.join(',') + '"</formula1></dataValidation>'); }
 
   // ===== CALENDARI =====
-  const grow = (k, b, t) => 8 + PITk[k] * b + 1 + 3 * t + 1;
-  for (let k = 0; k < G; k++) {
-    const L = LET[k]; log('Calendario ' + L);
-    const cw = mk(calname(L), 'Calendario A'); cw.tab = PAL[L][0];
-    for (let r = 1; r <= 7; r++) copyRow('Calendario A', r, cw, r, { L });
+  const grow = (k, b, t) => BASE[k][b] + 1 + 3 * t + 1;
+  const T3 = {}; for (const c of S['Calendario A'].rows[3].cells) T3[c[0]] = c[3];
+  for (const c of CSH) {
+    const L0 = LET[c.mem[0]]; log(c.name);
+    const cw = mk(c.name, 'Calendario A'); cw.tab = PAL[L0][0];
+    for (let r = 1; r <= 7; r++) copyRow('Calendario A', r, cw, r, { L: L0 });
     mergesRows('Calendario A', 1, 7, cw, 0);
-    const NR = NRk[k], NG = NGk[k], PITCH = PITk[k], CAL_LAST = CALk[k];
-    for (let b = 0; b < NR; b++) {
-      const base = 8 + PITCH * b;
-      copyRow('Calendario A', 8, cw, base, { L, over: { 1: (b + 1) + L } }); cw.merge('B' + base + ':L' + base);
+    const uni = c.mem.length > 1, first = {};
+    c.blocks.forEach(({ k, b, base }, bi) => {
+      const L = LET[k], NG = NGk[k], PITCH = PITk[k];
+      let over = { 1: (b + 1) + L };
+      if (uni) {   // ogni barra calcola da se' il nome del proprio girone
+        if (b === 0) first[k] = base;
+        over = { 1: (b + 1) + L, 2: '="GIORNATA "&ROMAN(VALUE(LEFT(A' + base + ',LEN(A' + base + ')-1)))&" - GIRONE "&UPPER($O' + base + ')' };
+      }
+      copyRow('Calendario A', 8, cw, base, { L, over }); cw.merge('B' + base + ':L' + base);
+      if (uni) { const R = x => x.replace(/\bM3\b/g, 'M' + base).replace(/\bN3\b/g, 'N' + base); cw.set(base, 13, L); cw.set(base, 14, '=' + R(T3[14])); cw.set(base, 15, '=' + R(T3[15])); }
       for (let t = 0; t < NG; t++) {
         const hdr = base + 1 + 3 * t;
-        for (let q = 0; q < 3; q++) copyRow('Calendario A', 12 + q, cw, hdr + q, { L, over: (q === 1 && b === 0 && t === 0) ? { 1: GOFF[k] + 1 } : null });
+        for (let q = 0; q < 3; q++) copyRow('Calendario A', 12 + q, cw, hdr + q, { L, over: (q === 1 && bi === 0 && t === 0) ? { 1: c.goff + 1 } : null });
         mergesRows('Calendario A', 12, 14, cw, hdr - 12);
       }
       const sp = base + PITCH - 1; copyRow('Calendario A', 24, cw, sp, { L }); cw.merge('A' + sp + ':L' + sp);
-    }
-    copyRow('Calendario A', 161, cw, CAL_LAST + 1, { L }); copyRow('Calendario A', 162, cw, CAL_LAST + 2, { L });
-    cw.printArea = 'A1:L' + (CAL_LAST + 2);
+    });
+    if (uni) cw.set(3, 1, '="GIRONI "&' + c.mem.map(k => 'UPPER($O$' + first[k] + ')').join('&" - "&') + '&" - Stagione "&Campionato!$D$6');
+    copyRow('Calendario A', 161, cw, c.last + 1, { L: L0 }); copyRow('Calendario A', 162, cw, c.last + 2, { L: L0 });
+    cw.printArea = 'A1:L' + (c.last + 2);
   }
 
   // ===== DATI =====
@@ -488,7 +523,7 @@ async function generate(opt) {
   copyRow('Dati', 1, dw, 1);
   dw.set(1, 16, 'Consolidamento delle righe di servizio dei fogli Calendario' + (G > 1 ? ' A-' + LET[G - 1] : ' A') + ': una riga per gara. Le classifiche cercano qui per NOME squadra, quindi il girone dipende solo dalla lettera in Campionato!E.');
   { let n = 2; const tr = S['Dati'].rows[2].cells;
-    for (let k = 0; k < G; k++) for (let b = 0; b < NRk[k]; b++) for (let t = 0; t < NGk[k]; t++) {
+    for (const c of CSH) for (const { k, b } of c.blocks) for (let t = 0; t < NGk[k]; t++) {
       const gr = grow(k, b, t);
       for (let c = 0; c < 14; c++) { const x = dw.cell(n, c + 1); x.s = tr[c][1]; setv(x, "='" + calname(LET[k]) + "'!" + CL(13 + c) + gr); }
       n++;
@@ -568,7 +603,7 @@ async function generate(opt) {
     }
   }
   let n = 2;
-  for (let k = 0; k < G; k++) for (let b = 0; b < NRk[k]; b++) for (let t = 0; t < NGk[k]; t++) icsrow(n++, 2, 'Calendario A', calname(LET[k]), grow(k, b, t));
+  for (const c of CSH) for (const { k, b } of c.blocks) for (let t = 0; t < NGk[k]; t++) icsrow(n++, 2, 'Calendario A', c.name, grow(k, b, t));
   for (const B of BR) for (const lst of B.PG) for (const [hdr, gr] of lst) icsrow(n++, 47, 'Playoff', B.sheet, gr);
   copyRow('Calendario.ics', 56, iw, n + 1);
   iw.printArea = 'A1:I1';
@@ -579,11 +614,10 @@ async function generate(opt) {
   for (let r = 1; r <= 7; r++) copyRow('DESIGNAZIONI', r, dsw, r);
   mergesRows('DESIGNAZIONI', 1, 7, dsw, 0);
   const DESGAME = [];
-  for (let k = 0; k < G; k++) {
-    const L = LET[k], off = DOFF[k], sub = ["'Calendario A'", "'" + calname(L) + "'"];
-    const NR = NRk[k], NG = NGk[k], PITCH = PITk[k];
-    for (let b = 0; b < NR; b++) {
-      const base = 8 + PITCH * b;
+  for (const c of CSH) {
+    const off = c.doff, sub = ["'Calendario A'", "'" + c.name + "'"];
+    for (const { k, base } of c.blocks) {
+      const L = LET[k], NG = NGk[k];
       copyRow('DESIGNAZIONI', 8, dsw, base + off, { L, refrow: base, sub }); mergesRows('DESIGNAZIONI', 8, 8, dsw, off + base - 8);
       for (let t = 0; t < NG; t++) {
         const hdr = base + 1 + 3 * t;
@@ -593,8 +627,8 @@ async function generate(opt) {
       }
     }
   }
-  let lastrow = DOFF[G - 1] + CALk[G - 1];
-  { let poff = DOFF[G - 1] + CALk[G - 1] + 25;
+  let lastrow = DESEND - 25;
+  { let poff = DESEND;
     for (const B of BR) {
       B.poff = poff; const sub = ["'Playoff'", "'" + B.sheet + "'"];
       B.PBAR.forEach((bar, si) => {
@@ -697,7 +731,6 @@ async function generate(opt) {
     const rowByCode = {}; for (let k = 0; k < G; k++) for (let j = 0; j < NTS[k]; j++) rowByCode[code(k, j)] = T1 + TS[k] + j;
     const fieldRow = {}; for (let k = 0; k < G; k++) for (let j = 0; j < NTS[k]; j++) fieldRow[code(k, j)] = F1 + TS[k] + j;
     for (let i = 0; i < NPO; i++) fieldRow['PO' + (i + 1)] = PO1 + i; fieldRow['TBD'] = TBDR;
-    const poff = DOFF[G - 1] + CALk[G - 1] + 25;
     const dsh = sheetOf('DESIGNAZIONI');
     const putDes = (r, o) => { (o.ar || []).forEach((v, j) => { if (v !== '' && v != null) setIf(dsh, r, 13 + j, v); }); (o.uc || []).forEach((v, j) => { if (v !== '' && v != null) setIf(dsh, r, 16 + j, v); }); };
     for (const o of opt.data.righe) {
@@ -780,7 +813,7 @@ async function generate(opt) {
   for (const nm of ['Arbitri', 'UdC']) { const sh = sheets.find(s => s.name === nm); if (!sh) continue; for (const R of sh.rows.values()) for (const x of R.cells.values()) if (x.k === 'f') x.v = x.v.replace(/([A-Z]{1,3}\$8:[A-Z]{1,3}\$)\d+(?!\d)/g, '$1' + DESLAST); }
 
   // ===== ordine e pacchetto =====
-  const order = ['Campionato', ...LET.map(calname), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'DESIGNAZIONI', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Dati'];
+  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'DESIGNAZIONI', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Dati'];
   const list = order.map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
   log('Scrittura del file');
   const files = [];
@@ -1047,10 +1080,11 @@ function extract(M) {
   }
   const calSheets = M.order.filter(n => /^Calendario(?! ?\.ics)/.test(n) && n !== 'Calendario.ics');
   const poSheets = M.order.filter(n => /^Playoff/.test(n) || /^Coppa/.test(n) || /Primavera/.test(n));
-  const cal = []; for (const n of calSheets) for (const g of games(S[n])) cal.push(g);
+  const cal = []; for (const n of calSheets) for (const g of games(S[n])) { g.sheet = n; cal.push(g); }
   const righe = [];
   const minutes = d => typeof d === 'number' ? Math.round(d * 1440) : (d === undefined ? null : str(d));
   const nGir = {}; letters.forEach(L => nGir[L] = 0);
+  const uniS = {};   // fogli calendario con piu' gironi -> calendario unificato
   const calRef = [];   // per DESIGNAZIONI: posizione nel nuovo modello di ogni gara letta
   for (const g of cal) {
     let L = null; const ta = teams.find(t => t.code === str(g.a)), tb = teams.find(t => t.code === str(g.b));
@@ -1059,6 +1093,7 @@ function extract(M) {
     const k = letters.indexOf(L); const i = ++nGir[L];
     const o = { t: 'gara', g: NEWL[k], i, a: codeMap[str(g.a)] || '', b: codeMap[str(g.b)] || '', d: minutes(g.d), c: vmap(g.c), ra: g.ra === undefined ? '' : g.ra, rb: g.rb === undefined ? '' : g.rb };
     righe.push(o); calRef.push(o);
+    (uniS[g.sheet] = uniS[g.sheet] || new Set()).add(NEWL[k]);
   }
   // playoff: tabellone principale (primo foglio Playoff) e, se c'e', seconda griglia (Torneo/Coppa Primavera)
   let po = { squadre: 0, qualificate: 0, gironi: '' }, pp = { squadre: 0, qualificate: 0 };
@@ -1127,7 +1162,9 @@ function extract(M) {
     'Designazioni lette: ' + desN + (desSkip ? ' (' + desSkip + ' senza gara corrispondente)' : '') + '; arbitri: ' + narb + '; ufficiali di campo: ' + nudc + '.'
   ];
   if (extraFields.length) report.push('Campi non legati a una squadra spostati sui campi neutri: ' + extraFields.join(', ') + '.');
-  return { tipo, gironi, params, po, pp, narb, nudc, data: { origine: tipo, righe }, report };
+  const uni = Object.values(uniS).filter(x => x.size > 1).map(x => [...x].sort().join(','));
+  if (uni.length) report.push('Calendari unificati: ' + uni.join('; ') + '.');
+  return { tipo, gironi, params, po, pp, narb, nudc, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
 }
 
 return { read, extract };
@@ -1158,7 +1195,7 @@ $('src').addEventListener('change', async ev => {
     $('gironi').value = X.gironi.map(g => g.name + ', ' + g.nt + ', ' + (g.color || GEN.DEFAULT_COLORS[0])).join('\n');
     $('cfg').value = X.params.join('\n');
     $('po').value = String(X.po.squadre || 0); $('poq').value = X.po.qualificate || ''; $('pog').value = X.po.gironi || '';
-    $('narb').value = X.narb || ''; $('nudc').value = X.nudc || '';
+    $('narb').value = X.narb || ''; $('nudc').value = X.nudc || ''; $('uni').value = (X.uni || '').split('\n').filter(Boolean).join('; ');
     $('pp').value = String((X.pp && X.pp.squadre) || 0); $('ppq').value = (X.pp && X.pp.qualificate) || '';
     const tsv = a => a.map(x => (x === undefined || x === null ? '' : String(x)).replace(/[\t\r\n]+/g, ' ')).join('\t');
     $('teams').value = X.data.righe.filter(o => o.t === 'sq').map(o => tsv([o.k, o.n, o.p, o.k[0]])).join('\n');
@@ -1177,7 +1214,7 @@ $('go').addEventListener('click', async () => {
   try {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
-    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim() };
+    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim() };
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
