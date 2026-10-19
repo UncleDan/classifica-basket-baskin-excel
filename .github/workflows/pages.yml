@@ -1,9 +1,12 @@
-# pages.yml by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.2 - 2026-10-19 13-05-40
+# pages.yml by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.3 - 2026-10-19 13-10-25
 # Pubblica su GitHub Pages solo il generatore HTML:
 #   - ramo main (o master) -> https://<utente>.github.io/<repo>/
 #   - ramo beta            -> https://<utente>.github.io/<repo>/beta/
-# Se il ramo principale non esiste si pubblica solo beta. A ogni pubblicazione
-# il sito viene ricostruito con le versioni presenti (vedi build_site.sh).
+# Se il ramo principale non esiste si pubblica solo beta (vedi build_site.sh).
+# GitHub Pages accetta pubblicazioni solo dal ramo predefinito: un push su un
+# altro ramo (es. beta) rilancia questa stessa azione sul ramo predefinito, che
+# ricostruisce il sito leggendo l'HTML da tutti i rami. Cosi' non serve
+# modificare le regole di protezione dell'ambiente github-pages.
 name: Pubblica generatore su GitHub Pages
 
 on:
@@ -17,16 +20,33 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  rilancia:
+    name: Rilancia sul ramo predefinito
+    if: github.ref_name != github.event.repository.default_branch
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Avvia la pubblicazione dal ramo ${{ github.event.repository.default_branch }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref "${{ github.event.repository.default_branch }}"
+
+  deploy:
+    name: Pubblica
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
