@@ -1,0 +1,48 @@
+# pages.yml by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.2 - 2026-10-19 13-05-40
+# Pubblica su GitHub Pages solo il generatore HTML:
+#   - ramo main (o master) -> https://<utente>.github.io/<repo>/
+#   - ramo beta            -> https://<utente>.github.io/<repo>/beta/
+# Se il ramo principale non esiste si pubblica solo beta. A ogni pubblicazione
+# il sito viene ricostruito con le versioni presenti (vedi build_site.sh).
+name: Pubblica generatore su GitHub Pages
+
+on:
+  push:
+    branches: [main, master, beta]
+    paths:
+      - 'Generatore_Campionato_Baskin.html'
+      - '.github/workflows/pages.yml'
+      - '.github/workflows/build_site.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout (con tutti i rami)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Prepara il sito (solo l'HTML)
+        run: bash .github/workflows/build_site.sh _site
+      - name: Configura Pages
+        uses: actions/configure-pages@v5
+      - name: Carica il sito
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Pubblica
+        id: deployment
+        uses: actions/deploy-pages@v4
