@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.7 - 2026-10-19 14-44-44 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.8 - 2026-10-19 15-10-10 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -58,7 +58,7 @@ code{font:13px ui-monospace,Consolas,monospace}
 </section>
 <section class="card">
 <h2>Gironi</h2>
-<p class="hint">Un girone per riga: <code>nome, squadre, colore</code>. Il nome va in D11 per la stampa; le lettere A, B, C… sono assegnate in ordine (massimo 26 gironi). Squadre da 3 a 40 (con un numero dispari ogni giornata una squadra riposa). Colore: nome HTML (green, red, navy, teal…), codice #RRGGBB, oppure gold, silver, bronze, platinum. Dopo un'importazione ogni riga ha un quarto valore, la lettera del girone del file importato da cui vengono i dati (<code>Ovest, 8, #B34324, A</code>): si possono cambiare nome, colore e numero di squadre, spostare le righe per cambiare l'ordine dei gironi, oppure cancellare una riga per escludere quel girone. Squadre, campi, calendari e playoff seguono il loro girone; le caselle Squadre e Campi si aggiornano quando si esce dalla casella.</p>
+<p class="hint">Un girone per riga: <code>nome, squadre, colore</code>. Il nome va in D11 per la stampa; le lettere A, B, C… sono assegnate in ordine (massimo 26 gironi). Squadre da 3 a 40 (con un numero dispari ogni giornata una squadra riposa). Colore: nome HTML (green, red, navy, teal…), codice #RRGGBB, oppure gold, silver, bronze, platinum. Dopo un'importazione ogni riga ha un quarto valore, la lettera del girone del file importato da cui vengono i dati (<code>Ovest, 8, #B34324, A</code>): si possono cambiare nome, colore e numero di squadre, spostare le righe per cambiare l'ordine dei gironi, oppure cancellare una riga per escludere quel girone (se manca la lettera vale la posizione della riga). Squadre, campi, calendari e playoff seguono il loro girone; le caselle Squadre e Campi si aggiornano quando si esce dalla casella.</p>
 <textarea id="gironi" spellcheck="false">Gold, 10, gold</textarea>
 <div id="prev"></div>
 <label style="display:block;margin-top:10px">Calendari unificati (facoltativo)<input id="uni" type="text" value="" placeholder="es. A,B oppure A-B; C-D"></label>
@@ -93,12 +93,12 @@ code{font:13px ui-monospace,Consolas,monospace}
 </section>
 <section class="card">
 <h2>Squadre (facoltativo)</h2>
-<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Se il codice non esiste nel nuovo modello la squadra va nel primo posto libero del suo girone.</p>
+<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Se il codice non esiste nel nuovo modello la squadra va nel primo posto libero del suo girone. Dopo un'importazione si possono cambiare nomi, penalizzazioni e codici: calendario e risultati seguono la squadra, e il suo campo di casa cambia codice con lei (anche negli scambi, es. A01 con A03).</p>
 <textarea id="teams" spellcheck="false" wrap="off" placeholder="A01&#9;Anaconde Audaci-Anacondeopoli AA&#9;&#9;A"></textarea>
 </section>
 <section class="card">
 <h2>Campi (facoltativo)</h2>
-<p class="hint">Un campo per riga: <code>codice, nome campo, link mappa</code>, come le colonne B-D del blocco CAMPI. Il codice e' quello della squadra che gioca in casa, oppure PO1-PO8 e TBD.</p>
+<p class="hint">Un campo per riga: <code>codice, nome campo, link mappa</code>, come le colonne B-D del blocco CAMPI. Il codice e' quello della squadra che gioca in casa, oppure PO1-PO8 e TBD. Dopo un'importazione si possono cambiare nome, link e codice: le gare giocate su quel campo lo seguono.</p>
 <textarea id="fields" spellcheck="false" wrap="off" placeholder="A01&#9;PalaAnaconde, Via dello Sport 1, Anacondeopoli AA&#9;https://..."></textarea>
 </section>
 <section class="card wide">
@@ -1229,11 +1229,14 @@ function merge(list) {
 // ---------------- riassegnazione dei gironi importati ----------------
 // map: lettera del girone nel file importato -> lettera nel nuovo modello (assente = girone escluso)
 function remapCode(c, map) { c = c == null ? '' : String(c); return /^[A-Z]\d+$/.test(c) ? (map[c[0]] ? map[c[0]] + c.slice(1) : null) : c; }
-function remap(righe, map) {
+function remap(righe, map, tm, fm) {
+  // map: gironi; tm/fm (facoltativi): codice squadra/campo nel file importato -> codice attuale (null = tolto)
+  const team = c => { c = c == null ? '' : String(c); if (tm && Object.prototype.hasOwnProperty.call(tm, c)) return tm[c] || ''; return remapCode(c, map) || ''; };
+  const venue = c => { c = c == null ? '' : String(c); if (fm && Object.prototype.hasOwnProperty.call(fm, c)) return fm[c] || ''; return team(c); };
   const out = [];
   for (const o of righe) {
-    if (o.t === 'gara') { const g = map[o.g]; if (!g) continue; const a = remapCode(o.a, map), b = remapCode(o.b, map), c = remapCode(o.c, map); out.push(Object.assign({}, o, { g, a: a || '', b: b || '', c: c || '' })); }
-    else if (o.t === 'po' || o.t === 'po2') { const a = remapCode(o.a, map), b = remapCode(o.b, map), c = remapCode(o.c, map); out.push(Object.assign({}, o, { a: a || '', b: b || '', c: c || '' })); }
+    if (o.t === 'gara') { const g = map[o.g]; if (!g) continue; out.push(Object.assign({}, o, { g, a: team(o.a), b: team(o.b), c: venue(o.c) })); }
+    else if (o.t === 'po' || o.t === 'po2') { const a = remapCode(o.a, map), b = remapCode(o.b, map); out.push(Object.assign({}, o, { a: a || '', b: b || '', c: venue(o.c) })); }
     else if (o.t === 'sq' || o.t === 'campo') { const k = remapCode(o.k, map); if (k) out.push(Object.assign({}, o, { k })); }
     else out.push(o);
   }
@@ -1261,13 +1264,16 @@ let CURMAP = null, STASH = {};
 function originMap() {
   const { gironi } = GEN.parseGironi($('gironi').value); const m = {};
   gironi.forEach((g, i) => { if (g.from && !m[g.from]) m[g.from] = String.fromCharCode(65 + i); });
+  // riga senza lettera di origine: prende il girone del file nella stessa posizione, se libero
+  const used = new Set(Object.values(m));
+  if (CURMAP) gironi.forEach((g, i) => { const L = String.fromCharCode(65 + i), o = Object.keys(CURMAP).find(x => CURMAP[x] === L); if (!g.from && !used.has(L) && o && !m[o]) { m[o] = L; used.add(L); } });
   return m;
 }
 function syncBoxes() {
-  if (!IMPORTED || !CURMAP) return;
+  if (!IMPORTED || !CURMAP) return false;
   const NEW = originMap(); const inv = {}; for (const o in CURMAP) inv[CURMAP[o]] = o;
   const same = Object.keys(CURMAP).length === Object.keys(NEW).length && Object.keys(CURMAP).every(o => CURMAP[o] === NEW[o]);
-  if (same) return;
+  if (same) return false;
   const conv = c => { const o = inv[c[0]]; return o === undefined ? { code: c } : NEW[o] ? { code: NEW[o] + c.slice(1) } : { out: o }; };
   for (const id of ['teams', 'fields']) {
     const keep = [];
@@ -1293,8 +1299,52 @@ function syncBoxes() {
   $('pog').value = letters($('pog').value);
   $('uni').value = $('uni').value.split(';').map(g => letters(g.trim())).filter(g => /[A-Z].*[,\-+\s].*[A-Z]/.test(g)).join('; ');
   CURMAP = NEW;
+  return true;
 }
-$('gironi').addEventListener('change', syncBoxes);
+$('gironi').addEventListener('change', () => { syncBoxes(); snapAll(); });
+// ogni riga delle caselle Squadre e Campi conserva il codice che aveva nel file importato (id):
+// se si cambia il codice, calendario, risultati e campi di gara seguono la squadra o il campo
+let TSNAP = [], FSNAP = [], TREG = new Map(), FREG = new Map(), IMPT = [], IMPF = [];
+const tkey = r => String(r.name || '').trim().toLowerCase();
+const fkey = r => (String(r.name || '').trim() + '|' + String(r.link || '').trim()).toLowerCase();
+function matchSnap(prev, rows, key, reg) {
+  const usedP = new Set(), usedId = new Set(), out = rows.map(r => ({ code: r.code, k: key(r), id: null }));
+  out.forEach(o => { if (!o.k || o.k === '|') return; const j = prev.findIndex((p, i) => !usedP.has(i) && p.id && !usedId.has(p.id) && p.k === o.k); if (j >= 0) { usedP.add(j); o.id = prev[j].id; usedId.add(o.id); } });
+  out.forEach(o => { if (o.id || !o.k) return; const id = reg.get(o.k); if (id && !usedId.has(id)) { o.id = id; usedId.add(id); } });
+  out.forEach((o, i) => { if (o.id) return; const p = prev[i]; if (p && p.id && !usedP.has(i) && !usedId.has(p.id)) { usedP.add(i); o.id = p.id; usedId.add(o.id); } });
+  return out;
+}
+function snapAll() {
+  if (!IMPORTED) return;
+  TSNAP = matchSnap(TSNAP, GEN.parseTeams($('teams').value).rows, tkey, TREG);
+  FSNAP = matchSnap(FSNAP, GEN.parseFields($('fields').value).rows, fkey, FREG);
+}
+function onTeams() {
+  if (!IMPORTED) return;
+  const old = new Map(TSNAP.filter(o => o.id).map(o => [o.id, o.code]));
+  const now = matchSnap(TSNAP, GEN.parseTeams($('teams').value).rows, tkey, TREG);
+  const ren = {}; for (const o of now) if (o.id && old.has(o.id) && old.get(o.id) !== o.code) ren[old.get(o.id)] = o.code;
+  TSNAP = now;
+  if (!Object.keys(ren).length) return;
+  // il campo di casa segue la squadra (scambi compresi)
+  const lines = $('fields').value.split('\n').map(line => {
+    if (!line.trim()) return line;
+    const sep = line.includes('\t') ? '\t' : line.includes(';') ? ';' : ',';
+    const p = line.split(sep); const c = p[0].trim().toUpperCase();
+    if (ren[c]) p[0] = ren[c];
+    return p.join(sep);
+  });
+  $('fields').value = lines.join('\n');
+  FSNAP = matchSnap(FSNAP, GEN.parseFields($('fields').value).rows, fkey, FREG);
+}
+$('teams').addEventListener('change', onTeams);
+$('fields').addEventListener('change', () => { if (IMPORTED) FSNAP = matchSnap(FSNAP, GEN.parseFields($('fields').value).rows, fkey, FREG); });
+function codeMaps() {   // codice nel file importato -> codice attuale (null = tolto)
+  const tm = {}, fm = {};
+  for (const c of IMPT) tm[c] = null; for (const o of TSNAP) if (o.id) tm[o.id] = o.code;
+  for (const c of IMPF) fm[c] = null; for (const o of FSNAP) if (o.id) fm[o.id] = o.code;
+  return { tm, fm };
+}
 let IMPORTED = null;
 let XS = [];   // file importati (uno o piu')
 async function importa(files, add) {
@@ -1320,6 +1370,11 @@ async function importa(files, add) {
     const righe = X.data.righe.filter(o => o.t !== 'sq' && o.t !== 'campo');
     IMPORTED = { righe, origine: list.length > 1 ? X.data.origine : X.tipo + ' (' + list[0].file + ')' };
     CURMAP = {}; X.gironi.forEach((g, i) => { const L = String.fromCharCode(65 + i); CURMAP[L] = L; }); STASH = {};
+    const sq = X.data.righe.filter(o => o.t === 'sq'), cp = X.data.righe.filter(o => o.t === 'campo');
+    IMPT = sq.map(o => o.k); IMPF = cp.map(o => o.k);
+    TREG = new Map(); sq.forEach(o => { const k = tkey({ name: o.n }); if (k && !TREG.has(k)) TREG.set(k, o.k); });
+    FREG = new Map(); cp.forEach(o => { const k = fkey({ name: o.n, link: o.l }); if (k !== '|' && !FREG.has(k)) FREG.set(k, o.k); });
+    TSNAP = sq.map(o => ({ code: o.k, k: tkey({ name: o.n }), id: o.k })); FSNAP = cp.map(o => ({ code: o.k, k: fkey({ name: o.n, link: o.l }), id: o.k }));
     rep.textContent = X.report.join('\n'); rep.className = 'ok';
     $('srcclear').style.display = ''; $('srcmore').style.display = '';
     preview();
@@ -1327,7 +1382,7 @@ async function importa(files, add) {
 }
 $('src').addEventListener('change', ev => importa([...ev.target.files], false));
 $('srcadd').addEventListener('change', ev => { importa([...ev.target.files], true); ev.target.value = ''; });
-$('srcx').addEventListener('click', ev => { ev.preventDefault(); IMPORTED = null; XS = []; CURMAP = null; STASH = {}; $('srcmore').style.display = 'none'; $('teams').value = ''; $('fields').value = ''; $('src').value = ''; $('rep').textContent = ''; $('srcclear').style.display = 'none'; });
+$('srcx').addEventListener('click', ev => { ev.preventDefault(); IMPORTED = null; XS = []; CURMAP = null; STASH = {}; TSNAP = []; FSNAP = []; $('srcmore').style.display = 'none'; $('teams').value = ''; $('fields').value = ''; $('src').value = ''; $('rep').textContent = ''; $('srcclear').style.display = 'none'; });
 $('go').addEventListener('click', async () => {
   const out = $('out'); out.innerHTML = ''; $('go').disabled = true;
   const say = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; out.appendChild(d); };
@@ -1335,13 +1390,13 @@ $('go').addEventListener('click', async () => {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
     const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim() };
-    syncBoxes();
+    if (syncBoxes()) snapAll(); else onTeams();
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
     let DATA = null;
     let IR = IMPORTED ? IMPORTED.righe : [];
-    if (IMPORTED && gironi.some(g => g.from)) IR = XL.remap(IR, originMap());   // gironi riordinati, rinominati o esclusi
+    if (IMPORTED) { const { tm, fm } = codeMaps(); IR = XL.remap(IR, originMap(), tm, fm); }   // gironi riordinati o esclusi, codici cambiati
     if (IMPORTED || BX.recs.length) DATA = { origine: IMPORTED ? IMPORTED.origine : 'caselle Squadre e Campi', righe: [...IR, ...BX.recs] };
     const t0 = performance.now();
     const r = await GEN.generate({ blueprint: BLUEPRINT, gironi, params: GEN.parseParams($('cfg').value), cfg, data: DATA });
