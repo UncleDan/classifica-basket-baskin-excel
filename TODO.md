@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.15) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 
@@ -55,11 +55,11 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 - [ ] **3.2 Fasi**: seconda fase nello stesso file (foglio "Calendario SECONDA FASE" del Piemonte Rosso 2025/2026, oggi sommata al girone) o in file separati (FVG 2023/2024 e 2024/2025, Veneto 2023/2024). Serve il concetto di fase, che distingua prima e seconda fase in classifiche e riepilogo.
 - [ ] **3.3 Final Four tra più file** (Veneto Ovest 2024/2025): il foglio "Final Four" non viene riconosciuto, le squadre sono scritte a mano e vengono anche dal file Veneto Est. I dati di origine sono incoerenti: in finale 1°-2° c'è una squadra che ha perso la semifinale.
 - [ ] **3.4 Nome del girone**: oggi viene preso dalla cella del girone, spesso generica ("UNICO", "A", "DOPPIO", "ANDATA / RITORNO", "EST" nel Veneto seconda fase A). Proposta: ricavarlo dal nome del file (Gold Est, Girone B…).
-- [ ] **3.5 Note scritte nella riga del campo** (Marche 2025/2026, es. "gara rinviata al 13-11-25 a Pesaro"): portarle nel foglio Note invece di perderle.
-- [ ] **3.6 Modelli vuoti**: messaggio chiaro ("file senza squadre, niente da importare") invece dell'errore generico.
+- [x] **3.5 Note scritte nella riga del campo** (Marche 2025/2026, es. "gara rinviata al 13-11-25 a Pesaro"): portarle nel foglio Note invece di perderle. Fatto nella Release 1.15.
+- [x] **3.6 Modelli vuoti**: messaggio chiaro ("file senza squadre, niente da importare") invece dell'errore generico. Fatto nella Release 1.15: un modello vuoto insieme ad altri file viene saltato.
 - [ ] **3.7 Torneo di Tortona** (2024/2025): formato diverso (foglio "Tournament", due tornei "Veterans - Games" e "Newbies - Games" con gironi). Decidere se supportarlo.
 - [ ] **3.8 Lombardia Nord 2026/2027**: tutte le tabelle del foglio Campionato sono spostate di una colonna a destra; oggi non si importa. In più il file ha calendari incompleti per i gironi da 12 squadre, numerazione delle gare sovrapposta, riferimenti a fogli cancellati e il playoff del modello a 10 gironi.
-- [ ] **3.9 Andata e ritorno per i campionati nuovi**: con l'importazione le giornate (compreso il ritorno) si copiano dal file di origine; per un campionato creato da zero il generatore fa solo il girone di sola andata.
+- [x] **3.9 Andata e ritorno per i campionati nuovi**: con l'importazione le giornate (compreso il ritorno) si copiano dal file di origine; per un campionato creato da zero il generatore fa solo il girone di sola andata. Fatto nella Release 1.15: casella "Andata e ritorno", non spuntata di default.
 - [ ] **3.10 Gare con una sola squadra**: oggi non contano per nessuno (Piemonte Rosso 2025/2026, Toscana 2023/2024). Da confermare.
 
 ## 4. Altro
