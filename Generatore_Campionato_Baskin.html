@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.11 - 2026-10-19 18-35-06 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.13 - 2026-10-20 06-09-46 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -30,6 +30,8 @@ select{font:14px ui-monospace,Consolas,monospace;background:transparent;color:va
 @media (max-width:520px){.pp{grid-template-columns:1fr}#plab{display:none}}
 
 .wide{grid-column:1/-1}
+label.chk{flex-direction:row;align-items:center;gap:8px;font-size:14px;color:var(--ink);margin:4px 0}
+label.chk input{width:auto;margin:0}
 .drop{border:2px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--mut);font-size:14px}
 .drop.over{border-color:var(--acc);background:rgba(127,127,127,.08)}
 .lnk{display:inline;color:var(--ink);text-decoration:underline;cursor:pointer;font-size:14px}
@@ -94,15 +96,19 @@ code{font:13px ui-monospace,Consolas,monospace}
 <label>Arbitri<input id="narb" type="number" autocomplete="off" min="0" max="2000" value=""></label>
 <label>Ufficiali di Campo<input id="nudc" type="number" autocomplete="off" min="0" max="2000" value=""></label>
 </div>
+<h2 style="margin-top:14px">Note e provvedimenti (facoltativi)</h2>
+<p class="hint">Fogli con il numero di gara e una casella larga per scrivere. Quello che si scrive compare nel RIEPILOGO accanto alla gara: prima le note tra parentesi, poi i provvedimenti disciplinari.</p>
+<label class="chk"><input id="note" type="checkbox" autocomplete="off"> Foglio Note</label>
+<label class="chk"><input id="prov" type="checkbox" autocomplete="off"> Foglio Provvedimenti Disciplinari</label>
 </section>
 <section class="card">
 <h2>Squadre (facoltativo)</h2>
-<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Il codice può essere libero (es. REG, BO1): in quel caso conta il girone in quarta colonna e la squadra va nel primo posto libero di quel girone, mantenendo il codice scelto. Dopo un'importazione si possono cambiare nomi, penalizzazioni e codici: calendario e risultati seguono la squadra, e il suo campo di casa cambia codice con lei (anche negli scambi, es. A01 con A03).</p>
+<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Il codice identifica la squadra (risultati e classifiche sono collegati al codice) e deve essere unico; il nome invece si può cambiare e può ripetersi in gironi diversi. Il codice può essere libero (es. REG, BO1): in quel caso conta il girone in quarta colonna e la squadra va nel primo posto libero di quel girone, mantenendo il codice scelto. Dopo un'importazione si possono cambiare nomi, penalizzazioni e codici: calendario e risultati seguono la squadra, e il suo campo di casa cambia codice con lei (anche negli scambi, es. A01 con A03).</p>
 <textarea autocomplete="off" id="teams" spellcheck="false" wrap="off" placeholder="A01&#9;Anaconde Audaci-Anacondeopoli AA&#9;&#9;A"></textarea>
 </section>
 <section class="card">
 <h2>Campi (facoltativo)</h2>
-<p class="hint">Un campo per riga: <code>codice, nome campo, link mappa</code>, come le colonne B-D del blocco CAMPI. Il codice e' quello della squadra che gioca in casa, oppure PO1-PO8 e TBD. Dopo un'importazione si possono cambiare nome, link e codice: le gare giocate su quel campo lo seguono.</p>
+<p class="hint">Un campo per riga: <code>codice, nome campo, link mappa</code>, come le colonne B-D del blocco CAMPI. Il codice e' quello della squadra che gioca in casa, oppure PO1-PO8 e TBD; ogni codice compare una sola volta. Dopo un'importazione si possono cambiare nome, link e codice: le gare giocate su quel campo lo seguono.</p>
 <textarea autocomplete="off" id="fields" spellcheck="false" wrap="off" placeholder="A01&#9;PalaAnaconde, Via dello Sport 1, Anacondeopoli AA&#9;https://..."></textarea>
 </section>
 <section class="card wide">
@@ -448,7 +454,7 @@ async function generate(opt) {
       const t = tc(n); if (t == null || !TC[sr][t]) continue;
       const x = putStyle(sr, n, sr); let v = null;
       if (n <= 24) { if (n === t && TC[sr][t][2] === 's') v = TC[sr][t][3]; }
-      else if (n >= SLOT0 && n < SLOT0 + NT) { const j = n - SLOT0 + 1; v = sr === 13 ? j + '^' : (j === 1 ? 'Squadre del girone (in ordine di inserimento)' : null); }
+      else if (n >= SLOT0 && n < SLOT0 + NT) { const j = n - SLOT0 + 1; v = sr === 13 ? j + '^' : (j === 1 ? 'Codici delle squadre del girone (in ordine di inserimento)' : null); }
       else if (n === CFN_COL) v = TC[sr][t][3];
       else for (let b = 0; b < 4; b++) { if (n === BS[b]) v = 'Squadra'; else if (n > BS[b] && n <= BS[b] + NT) { const j = n - BS[b]; if (sr === 13) v = j + '^'; else if (j === 1) v = ['Vittorie Scontri Diretti', 'Sconfitte & Forfait Scontri Diretti', 'Punti Fatti Scontri Diretti', 'Punti Subiti Scontri Diretti'][b]; } }
       if (v != null) setv(x, v);
@@ -456,9 +462,10 @@ async function generate(opt) {
   }
   ws.merge('B12:W12'); ws.merge(slotcol(1) + '12:' + slotcol(NT) + '12'); for (let b = 0; b < 4; b++) ws.merge(bcol(b, 1) + '12:' + bcol(b, NT) + '12');
   const D = col => 'Dati!$' + col + '$2:$' + col + '$' + DATI_LAST;
-  const PJ = x => 'INDEX($J$' + T1 + ':$J$' + T2 + ',MATCH(' + x + ',$H$' + T1 + ':$H$' + T2 + ',0))';
-  const SU = (r, Sx) => '$H' + r + '<>"",$' + Sx + r + '<>"",$H' + r + '<>$' + Sx + r + ',IFERROR(' + PJ('$H' + r) + ',-1)=IFERROR(' + PJ('$' + Sx + r) + ',-2)';
-  const sf = (col, c1, c2, r, Sx) => 'SUMIFS(' + D(col) + ',' + D(c1) + ',$H' + r + ',' + D(c2) + ',$' + Sx + r + ')';
+  // scontri diretti per codice squadra: le colonne dei posti (slot) contengono i codici
+  const PJ = x => 'INDEX($J$' + T1 + ':$J$' + T2 + ',MATCH(' + x + ',$B$' + T1 + ':$B$' + T2 + ',0))';
+  const SU = (r, Sx) => '$H' + r + '<>"",$' + Sx + r + '<>"",$B' + r + '<>$' + Sx + r + ',IFERROR(' + PJ('$B' + r) + ',-1)=IFERROR(' + PJ('$' + Sx + r) + ',-2)';
+  const sf = (col, c1, c2, r, Sx) => 'SUMIFS(' + D(col) + ',' + D(c1) + ',$B' + r + ',' + D(c2) + ',$' + Sx + r + ')';
   const cond = (b, r, Sx) => b === 0 ? sf('B', 'A', 'H', r, Sx) + '+' + sf('I', 'H', 'A', r, Sx)
     : b === 1 ? sf('D', 'A', 'H', r, Sx) + '+' + sf('K', 'H', 'A', r, Sx) + '+' + sf('C', 'A', 'H', r, Sx) + '+' + sf('J', 'H', 'A', r, Sx)
     : b === 2 ? sf('E', 'A', 'H', r, Sx) + '+' + sf('L', 'H', 'A', r, Sx) : sf('F', 'A', 'H', r, Sx) + '+' + sf('M', 'H', 'A', r, Sx);
@@ -472,14 +479,14 @@ async function generate(opt) {
       if (S['Campionato'].rows[14].ht != null) ws.row(r).ht = S['Campionato'].rows[14].ht;
       for (let n = 2; n <= CFN_COL; n++) { const t = tc(n); if (t != null && tplRow14[t]) putStyle(r, n, 14, L); }
       ws.set(r, 2, code(k, j)); ws.set(r, 5, L);
-      for (const n of [7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) { const c = tplRow14[n]; if (c && c[2] === 'f') ws.set(r, n, '=' + fixf(shift(c[3], r - 14))); }
+      for (const n of [7, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]) { const c = tplRow14[n]; if (c && c[2] === 'f') { let f = fixf(shift(c[3], r - 14)); if (n >= 12 && n <= 17) f = f.split(',$H' + r + ',').join(',$B' + r + ','); ws.set(r, n, '=' + f); } }   // somme per codice squadra
       ws.set(r, 9, '=TEXT(1000000000+J' + r + ',"|0000000000|")&TEXT(SUM(' + rng(0, r) + '),"0000000000|")&IF(SUM(' + rng(3, r) + ')=0,"0000000000|",TEXT(ROUND(SUM(' + rng(2, r) + ')/SUM(' + rng(3, r) + '),4)*100000,"0000000000|"))&IF(P' + r + '=0,"0000000000|",TEXT(ROUND(O' + r + '/P' + r + ',4)*100000,"0000000000|"))');
       const tie = '$E$' + T1 + ':$E$' + T2 + ',$E' + r + ',$J$' + T1 + ':$J$' + T2 + ',$J' + r + ',$C$' + T1 + ':$C$' + T2 + ',"<>"';
       ws.set(r, 21, '=IF(COUNTIFS(' + tie + ')<=1,"-",SUM(' + rng(0, r) + ')&"-"&SUM(' + rng(1, r) + '))');
       ws.set(r, 22, '=IF(COUNTIFS(' + tie + ',$' + CFc + '$' + T1 + ':$' + CFc + '$' + T2 + ',$' + CFc + r + ')<=1,"-",IF(SUM(' + rng(3, r) + ')=0,0,ROUND(SUM(' + rng(2, r) + ')/SUM(' + rng(3, r) + '),3)))');
       ws.set(r, 23, '=IF(COUNTIFS(' + tie + ',$' + CFc + '$' + T1 + ':$' + CFc + '$' + T2 + ',$' + CFc + r + ',$V$' + T1 + ':$V$' + T2 + ',$V' + r + ')<=1,"-",IF(P' + r + '=0,0,ROUND(O' + r + '/P' + r + ',3)))');
       ws.set(r, 24, '=IF($C' + r + '="","",$E' + r + '&"#"&COUNTIFS($E$' + T1 + ':$E' + r + ',$E' + r + ',$C$' + T1 + ':$C' + r + ',"<>"))');
-      for (let jj = 1; jj <= NT; jj++) ws.set(r, SLOT0 + jj - 1, '=IFERROR(INDEX($H$' + T1 + ':$H$' + T2 + ',MATCH($E' + r + '&"#' + jj + '",$X$' + T1 + ':$X$' + T2 + ',0)),"")');
+      for (let jj = 1; jj <= NT; jj++) ws.set(r, SLOT0 + jj - 1, '=IFERROR(INDEX($B$' + T1 + ':$B$' + T2 + ',MATCH($E' + r + '&"#' + jj + '",$X$' + T1 + ':$X$' + T2 + ',0)),"")');
       for (let b = 0; b < 4; b++) {
         ws.set(r, BS[b], '=$C' + r);
         for (let jj = 1; jj <= NT; jj++) { const Sx = slotcol(jj); ws.set(r, BS[b] + jj, '=IF(AND(' + SU(r, Sx) + '),' + cond(b, r, Sx) + ',"-")'); }
@@ -517,6 +524,7 @@ async function generate(opt) {
       for (let t = 0; t < NG; t++) {
         const hdr = base + 1 + 3 * t;
         for (let q = 0; q < 3; q++) copyRow('Calendario A', 12 + q, cw, hdr + q, { L, over: (q === 1 && bi === 0 && t === 0) ? { 1: c.goff + 1 } : null });
+        { const g = hdr + 1; cw.set(g, 13, '=IF($B' + g + '="","(Squadra A)",$C' + g + ')'); cw.set(g, 20, '=IF($D' + g + '="","(Squadra B)",$E' + g + ')'); }   // Dati per codice squadra
         mergesRows('Calendario A', 12, 14, cw, hdr - 12);
       }
       const sp = base + PITCH - 1; copyRow('Calendario A', 24, cw, sp, { L }); cw.merge('A' + sp + ':L' + sp);
@@ -531,7 +539,7 @@ async function generate(opt) {
   log('Dati');
   const dw = mk('Dati', 'Dati'); dw.hidden = true;
   copyRow('Dati', 1, dw, 1);
-  dw.set(1, 16, 'Consolidamento delle righe di servizio dei fogli Calendario' + (G > 1 ? ' A-' + LET[G - 1] : ' A') + ': una riga per gara. Le classifiche cercano qui per NOME squadra, quindi il girone dipende solo dalla lettera in Campionato!E.');
+  dw.set(1, 16, 'Consolidamento delle righe di servizio dei fogli Calendario' + (G > 1 ? ' ' + LET[0] + '-' + LET[G - 1] : ' ' + LET[0]) + ': una riga per gara. Le classifiche cercano qui per CODICE squadra (il nome si puo\' cambiare e ripetere in gironi diversi); il girone dipende solo dalla sigla in Campionato!E.');
   { let n = 2; const tr = S['Dati'].rows[2].cells;
     for (const c of CSH) for (const { k, b } of c.blocks) for (let t = 0; t < NGk[k]; t++) {
       const gr = grow(k, b, t);
@@ -618,11 +626,32 @@ async function generate(opt) {
   copyRow('Calendario.ics', 56, iw, n + 1);
   iw.printArea = 'A1:I1';
 
+  // ===== NOTE e PROVVEDIMENTI DISCIPLINARI (facoltativi): numero di gara + testo libero =====
+  const NOTE = !!C.note && C.note !== '0', PROV = !!C.prov && C.prov !== '0';
+  const NGAMES = GTOT + BR.reduce((a, B) => a + B.ngames, 0), NXR = Math.max(NGAMES, 20) + 1;
+  const XSH = {};
+  for (const [on, nm, title] of [[NOTE, 'Note', 'Note'], [PROV, 'Provvedimenti Disciplinari', 'Provvedimenti disciplinari']]) {
+    if (!on) continue;
+    log(nm);
+    const xw = mk(nm, 'Calendario.ics'); xw.tab = '757575'; XSH[nm] = xw;
+    xw.cols = '<cols><col width="9" customWidth="1" min="1" max="1"/><col width="120" customWidth="1" min="2" max="2"/></cols>';
+    [['Gara N.', 1], [title, 2]].forEach(([h, c]) => { const x = xw.cell(1, c); x.s = 3; setv(x, h); });
+    for (let r = 2; r <= NXR; r++) { xw.cell(r, 1).s = 0; xw.cell(r, 2).s = 225; }
+    xw.dv.push('<dataValidation type="whole" allowBlank="1" showErrorMessage="1" errorTitle="Gara N." error="Scrivere il numero della gara (da 1 a ' + NGAMES + ')." sqref="A2:A' + NXR + '"><formula1>1</formula1><formula2>' + NGAMES + '</formula2></dataValidation>');
+    xw.printArea = 'A1:B' + NXR;
+  }
+  // testo per il RIEPILOGO: (note) seguite dai provvedimenti
+  const xlook = (nm, r) => { const R = "'" + nm + "'!$"; return 'INDEX(' + R + 'B$2:$B$' + NXR + ',MATCH($A' + r + ',' + R + 'A$2:$A$' + NXR + ',0))'; };
+  const xnote = r => 'IFERROR(IF(' + xlook('Note', r) + '="","","("&' + xlook('Note', r) + '&")"),"")';
+  const xprov = r => 'IFERROR(' + xlook('Provvedimenti Disciplinari', r) + '&"","")';
+  const xtext = r => NOTE && PROV ? '=' + xnote(r) + '&IF(AND(' + xnote(r) + '<>"",' + xprov(r) + '<>"")," ","")&' + xprov(r) : NOTE ? '=' + xnote(r) : '=' + xprov(r);
+
   // ===== RIEPILOGO: una gara per riga, solo formule =====
   log('RIEPILOGO');
   { const ew = mk('RIEPILOGO', 'Calendario.ics'); ew.tab = '757575';
     const HDR = ['Gara N.', 'Lettera Girone', 'Nome Girone', 'Giornata', 'Fase', 'Squadra A', 'Squadra B', 'Data', 'Ora', 'Campo', 'Punti Squadra A', 'Punti Squadra B', 'Sconfitta a tavolino'];
-    const W = [8, 8, 18, 9, 26, 32, 32, 11, 7, 40, 9, 9, 11];
+    if (NOTE || PROV) HDR.push(NOTE && PROV ? 'Note e provvedimenti disciplinari' : NOTE ? 'Note' : 'Provvedimenti disciplinari');
+    const W = [8, 8, 18, 9, 26, 32, 32, 11, 7, 40, 9, 9, 11, 60];
     ew.cols = '<cols>' + W.map((w, i) => '<col width="' + w + '" customWidth="1" min="' + (i + 1) + '" max="' + (i + 1) + '"/>').join('') + '</cols>';
     HDR.forEach((h, i) => { const x = ew.cell(1, i + 1); x.s = 3; setv(x, h); });
     let r = 2;
@@ -635,6 +664,7 @@ async function generate(opt) {
       put(10, '=' + X + '$B$' + (gr + 1));
       put(11, '=IF(' + X + '$J$' + gr + '="","",' + X + '$J$' + gr + ')'); put(12, '=IF(' + X + '$L$' + gr + '="","",' + X + '$L$' + gr + ')');
       put(13, '=IF(AND(' + X + '$J$' + gr + '="",' + X + '$L$' + gr + '=""),"",IF(N(' + X + '$O$' + gr + ')+N(' + X + '$V$' + gr + ')>0,"Sì","No"))');
+      if (NOTE || PROV) put(14, xtext(r));
     };
     // girone all'italiana: solo andata (questo modello non prevede il ritorno), in ordine di lettera girone e di giornata
     for (let k = 0; k < G; k++) {
@@ -662,7 +692,7 @@ async function generate(opt) {
         r++;
       }));
     }
-    ew.printArea = 'A1:M' + (r - 1);
+    ew.printArea = 'A1:' + (NOTE || PROV ? 'N' : 'M') + (r - 1);
   }
 
   // ===== DESIGNAZIONI =====
@@ -789,6 +819,9 @@ async function generate(opt) {
     const fieldRow = {}; for (let k = 0; k < G; k++) for (let j = 0; j < NTS[k]; j++) fieldRow[code(k, j)] = F1 + TS[k] + j;
     for (let i = 0; i < NPO; i++) fieldRow['PO' + (i + 1)] = PO1 + i; fieldRow['TBD'] = TBDR;
     const dsh = (NARB || NUDC) ? sheetOf('DESIGNAZIONI') : null;
+    const GNUM = {}; for (const c of CSH) { let n = c.goff; for (const { k, b } of c.blocks) for (let t = 0; t < NGk[k]; t++) GNUM[k + ':' + (b * NGk[k] + t)] = ++n; }
+    const XNOTE = [], XPROV = [];
+    const putX = (num, o) => { if (o.nota) XNOTE.push([num, o.nota]); if (o.prov) XPROV.push([num, o.prov]); };
     const putDes = (r, o) => { if (!dsh) return; (o.ar || []).forEach((v, j) => { if (v !== '' && v != null) setIf(dsh, r, 13 + j, v); }); (o.uc || []).forEach((v, j) => { if (v !== '' && v != null) setIf(dsh, r, 16 + j, v); }); };
     for (const o of opt.data.righe) {
       let done = true;
@@ -804,6 +837,7 @@ async function generate(opt) {
           if (o.c) setIf(sh, gr + 1, 9, o.c);
           if (o.ra !== '' && o.ra != null) setIf(sh, gr, 10, o.ra); if (o.rb !== '' && o.rb != null) setIf(sh, gr, 12, o.rb);
           putDes(gr + DOFF[k], o);
+          putX(GNUM[k + ':' + idx], o);
         }
       }
       else if (o.t === 'po' || o.t === 'po2') {
@@ -816,6 +850,7 @@ async function generate(opt) {
         if (!B || si < 0 || idx < 0 || idx >= B.PG[si].length) done = false;
         else {
           const pw = B.sh, [hdr, gr, vr] = B.PG[si][idx];
+          { let f = 0; for (let a = 0; a < si; a++) f += B.PG[a].length; putX(B.first + f + idx, o); }
           if (si === 0 && o.a && /^[A-Z]{1,3}\d+$/.test(o.a) && o.b && /^[A-Z]{1,3}\d+$/.test(o.b)) { B.imp = true; setIf(pw, gr, 3, o.a); setIf(pw, gr, 5, o.b); }
           if (si > 0 && o.ka && o.kb) {
             const flat = []; B.SECT.forEach((s, a) => B.PG[a].forEach(g => flat.push(g[1])));
@@ -835,6 +870,11 @@ async function generate(opt) {
       else if (o.t === 'par' || o.t === 'fine') continue;
       else done = false;
       if (done) imp.ok++; else if (o.n || o.a || o.b || o.ra || o.rb || o.l || o.d) imp.skip++;
+    }
+    for (const [nm, L] of [['Note', XNOTE], ['Provvedimenti Disciplinari', XPROV]]) {
+      if (!L.length) continue;
+      const xw = XSH[nm]; if (!xw) { imp.skip += L.length; continue; }
+      L.sort((x, y) => x[0] - y[0]).forEach(([num, txt], i) => { if (i + 2 > NXR) { imp.skip++; return; } setv(xw.cell(i + 2, 1), num); setv(xw.cell(i + 2, 2), String(txt)); imp.ok++; });
     }
   }
 
@@ -857,10 +897,11 @@ async function generate(opt) {
     ['n', PO ? '* Playoff a ' + PO + ' squadre: le prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + '; gare numerate dalla ' + (GTOT + 1) + ' alla ' + (GTOT + BR[0].ngames) + '.' : '* Nessun playoff.'],
     ...(PP ? [['n', '* Torneo Primavera a ' + PP + ' squadre: le classificate dalla ' + (POQ + 1) + 'a alla ' + (POQ + PPQ) + 'a ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + '; gare numerate dalla ' + BR[1].first + ' alla ' + (BR[1].first + BR[1].ngames - 1) + '. In classifica finale occupa le posizioni dalla ' + (PO + 1) + 'a alla ' + (PO + PP) + 'a.']] : []),
     ['n', '* Classifica secondo i criteri Baskin: punti, poi vittorie negli scontri diretti, quoziente canestri negli scontri diretti, quoziente canestri totale, ordine alfabetico.'],
-    ['n', '* Il girone di una squadra dipende SOLO dalla lettera in colonna E del foglio Campionato. Il foglio nascosto Dati consolida le righe di servizio dei calendari.'],
+    ['n', '* Il girone di una squadra dipende SOLO dalla sigla in colonna E del foglio Campionato. I risultati sono collegati al CODICE squadra (colonna B), che deve essere unico: il nome si puo\' cambiare in qualsiasi momento e puo\' ripetersi in gironi diversi. Anche i codici dei campi devono essere unici. Il foglio nascosto Dati consolida le righe di servizio dei calendari.'],
     ['n', '* Nomi dei gironi per la stampa: cella D11 del foglio Campionato (' + names.map((x, i) => x || LET[i]).join(', ') + ').'],
     ['n', '* Loghi: link pubblici alle immagini nelle celle D3 e D4 del foglio Campionato (funzione IMAGE: Google Sheets ed Excel 365).'],
     ['n', '* Colori dei gironi: ' + LET.map((L, i) => L + ' ' + cols[i]).join(', ') + '.'],
+    ...((NOTE || PROV) ? [['n', '* ' + [NOTE ? 'Foglio Note' : '', PROV ? 'foglio Provvedimenti Disciplinari' : ''].filter(Boolean).join(' e ') + ': numero di gara in colonna A e testo libero in colonna B (una riga per gara); il testo compare nel RIEPILOGO' + (NOTE && PROV ? ', prima le note tra parentesi e poi i provvedimenti.' : '.')]] : []),
     ['n', '* Foglio RIEPILOGO: una gara per riga (numero, girone, giornata, fase, squadre, data, ora, campo, punti, sconfitta a tavolino), ricavato con formule dai calendari' + (BR.length ? ' e dai tabelloni' : '') + '.'],
     ['n', '* Le formule usano solo intervalli di celle espliciti, senza nomi definiti.'],
     ...(opt.data && opt.data.origine ? [['n', '* Dati importati da: ' + opt.data.origine + '.']] : [])
@@ -871,7 +912,7 @@ async function generate(opt) {
   for (const nm of ['Arbitri', 'UdC']) { const sh = sheets.find(s => s.name === nm); if (!sh) continue; for (const R of sh.rows.values()) for (const x of R.cells.values()) if (x.k === 'f') x.v = x.v.replace(/([A-Z]{1,3}\$8:[A-Z]{1,3}\$)\d+(?!\d)/g, '$1' + DESLAST); }
 
   // ===== ordine e pacchetto =====
-  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'DESIGNAZIONI', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'RIEPILOGO', 'Dati'];
+  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'DESIGNAZIONI', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'RIEPILOGO', 'Note', 'Provvedimenti Disciplinari', 'Dati'];
   // senza arbitri e Ufficiali di Campo il foglio DESIGNAZIONI non serve
   const list = order.filter(nm => nm !== 'DESIGNAZIONI' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
   log('Scrittura del file');
@@ -990,7 +1031,7 @@ function boxRecords(teams, fields, gironi) {
   for (const t of teams) if (valid.has(t.code) && (!t.gir || t.gir === pre(t.code))) used.add(t.code);
   for (const t of teams) {
     if (special(t.code)) { warn.push('Squadra ' + t.code + ': codice riservato ai campi neutri.'); continue; }
-    if (seen.has(t.code)) { warn.push('Squadra ' + t.code + ': codice ripetuto, riga ignorata.'); continue; }
+    if (seen.has(t.code)) { warn.push('Squadra ' + t.code + ': codice ripetuto, riga ignorata (i codici delle squadre devono essere unici; i nomi invece possono ripetersi).'); continue; }
     seen.add(t.code);
     const L = LET.includes(t.gir) ? t.gir : (LET.includes(pre(t.code)) ? pre(t.code) : '');
     if (!L) { warn.push('Squadra ' + t.code + ': manca il girone (quarta colonna).'); continue; }
@@ -999,7 +1040,10 @@ function boxRecords(teams, fields, gironi) {
     used.add(c); map[t.code] = c;
     recs.push({ t: 'sq', k: c, code: t.code, n: t.name, p: t.pen, g: L });
   }
+  const seenF = new Set();
   for (const f of fields) {
+    if (seenF.has(f.code)) { warn.push('Campo ' + f.code + ': codice ripetuto, riga ignorata (i codici dei campi devono essere unici).'); continue; }
+    seenF.add(f.code);
     const c = map[f.code] || (/^PO[1-8]$/.test(f.code) || f.code === 'TBD' ? f.code : null);
     if (!c) { warn.push('Campo ' + f.code + ' senza squadra corrispondente.'); continue; }
     recs.push({ t: 'campo', k: c, n: f.name, l: f.link });
@@ -1209,10 +1253,16 @@ function extract(M) {
   // designazioni: per numero gara se disponibile, altrimenti per ordine
   const des = S['DESIGNAZIONI'];
   let desN = 0, desSkip = 0;
+  const byNum = new Map(); cal.forEach((g, i) => { if (typeof g.num === 'number' && calRef[i]) byNum.set(g.num, calRef[i]); });
+  { let pi = 0; poAll.forEach(p => p.gs.forEach(g => { if (typeof g.num === 'number' && poRef[pi]) byNum.set(g.num, poRef[pi]); pi++; })); }
+  // fogli Note e Provvedimenti Disciplinari: numero di gara + testo, legati alla gara (seguono la nuova numerazione)
+  const xn = { nota: [0, 0], prov: [0, 0] };
+  for (const [nm, key] of [['Note', 'nota'], ['Provvedimenti Disciplinari', 'prov']]) {
+    const sh = S[nm]; if (!sh) continue; xn[key].sheet = true;
+    for (let r = 2; r <= sh.maxRow; r++) { const num = get(sh, r, 1), txt = str(get(sh, r, 2)); if (!txt) continue; const tgt = typeof num === 'number' ? byNum.get(num) : null; if (tgt) { tgt[key] = tgt[key] ? tgt[key] + ' ' + txt : txt; xn[key][0]++; } else xn[key][1]++; }
+  }
   if (des) {
     const dg = games(des);
-    const byNum = new Map(); cal.forEach((g, i) => { if (typeof g.num === 'number') byNum.set(g.num, calRef[i]); });
-    let pi = 0; poAll.forEach(p => p.gs.forEach(g => { if (typeof g.num === 'number' && poRef[pi]) byNum.set(g.num, poRef[pi]); pi++; }));
     const seq = [...calRef, ...poRef];
     dg.forEach((g, i) => {
       const R = des.cells.get(g.row) || new Map();
@@ -1243,10 +1293,11 @@ function extract(M) {
     'Designazioni lette: ' + desN + (desSkip ? ' (' + desSkip + ' senza gara corrispondente)' : '') + '; arbitri: ' + narb + '; ufficiali di campo: ' + nudc + '.'
   ];
   if (forfNote) report.push(forfNote);
+  for (const [key, lab] of [['nota', 'Note'], ['prov', 'Provvedimenti disciplinari']]) if (xn[key].sheet) report.push(lab + ' lette: ' + xn[key][0] + (xn[key][1] ? ' (' + xn[key][1] + ' senza gara corrispondente)' : '') + '.');
   if (extraFields.length) report.push('Campi non legati a una squadra spostati sui campi neutri: ' + extraFields.join(', ') + '.');
   const uni = Object.values(uniS).filter(x => x.size > 1).map(x => [...x].sort((p, q) => NEWL.indexOf(p) - NEWL.indexOf(q)).join(','));
   if (uni.length) report.push('Calendari unificati: ' + uni.join('; ') + '.');
-  return { tipo, gironi, params, po, pp, narb, nudc, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
+  return { tipo, gironi, params, po, pp, narb, nudc, note: !!xn.nota.sheet, prov: !!xn.prov.sheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
 }
 
 // ---------------- fusione di piu' file ----------------
@@ -1275,7 +1326,7 @@ function merge(list) {
     }
     const vc = c => poMap[c] || sh(c);
     for (const o of X.data.righe) {
-      if (o.t === 'sq') { const nm = (o.n || '').trim().toLowerCase(); if (nm) { if (seen.has(nm)) warn.push('la squadra "' + o.n + '" e\' presente sia in ' + seen.get(nm) + ' sia in ' + X.file); else seen.set(nm, X.file); } righe.push(Object.assign({}, o, { k: sh(o.k) })); }
+      if (o.t === 'sq') { righe.push(Object.assign({}, o, { k: sh(o.k) })); }
       else if (o.t === 'campo') { if (!(/^PO\d+$/.test(o.k) || o.k === 'TBD')) righe.push(Object.assign({}, o, { k: sh(o.k) })); }
       else if (o.t === 'gara') righe.push(Object.assign({}, o, { g: smap[o.g] || o.g, a: sh(o.a), b: sh(o.b), c: vc(o.c) }));
       else if (o.t === 'arb' || o.t === 'udc') { const M = o.t === 'arb' ? arb : udc; const k = (o.n || '').trim().toLowerCase(); if (k && !M.has(k)) M.set(k, o); }
@@ -1293,7 +1344,7 @@ function merge(list) {
   params[3] = LET.join(','); params[9] = gironi.map(g => g.name).join(',');
   report.unshift('Fusione di ' + list.length + ' file: ' + gironi.length + ' gironi in totale. Parametri presi dal primo file; il playoff si imposta nella scheda Playoff.');
   if (warn.length) report.push('Attenzione: ' + warn.join('; ') + '.');
-  return { tipo: 'Fusione di ' + list.length + ' file', gironi, params, po: { squadre: 0, qualificate: '', gironi: '' }, pp: { squadre: 0, qualificate: '' }, narb: i, nudc: u, uni: uni.join('\n'), data: { origine: 'fusione di ' + list.map(X => X.file).join(', '), righe }, report };
+  return { tipo: 'Fusione di ' + list.length + ' file', gironi, params, po: { squadre: 0, qualificate: '', gironi: '' }, pp: { squadre: 0, qualificate: '' }, narb: i, nudc: u, note: list.some(X => X.note), prov: list.some(X => X.prov), uni: uni.join('\n'), data: { origine: 'fusione di ' + list.map(X => X.file).join(', '), righe }, report };
 }
 
 // ---------------- riassegnazione dei gironi importati ----------------
@@ -1326,7 +1377,7 @@ if (typeof module !== 'undefined') module.exports = XL;
 const $ = id => document.getElementById(id);
 // ---------- valori iniziali (anche dopo Reset; il browser non deve riproporre valori vecchi) ----------
 const DEF = { gironi: 'Gold, 10, gold', cfg: ['Campionato Baskin', '', '', 'A', '2026/2027', '3', '1', '0', '40-0', 'Gold'].join('\n'), uni: '', po: '8', poq: '8', pog: '', pp: '0', ppq: '', narb: '', nudc: '', teams: '', fields: '' };
-function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; }
+function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; }
 setDefaults();
 function preview() {
   const { gironi, err } = GEN.parseGironi($('gironi').value); const S = GEN.sigle(gironi); let h = '';
@@ -1404,10 +1455,18 @@ function syncBoxes() {   // true se sono cambiati sigle, ordine o gironi inclusi
 const tkey = r => String(r.name || '').trim().toLowerCase();
 const fkey = r => (String(r.name || '').trim() + '|' + String(r.link || '').trim()).toLowerCase();
 function matchSnap(prev, rows, key, reg) {
-  const usedP = new Set(), usedId = new Set(), out = rows.map(r => ({ code: r.code, k: key(r), id: null }));
-  out.forEach(o => { if (!o.k || o.k === '|') return; const j = prev.findIndex((p, i) => !usedP.has(i) && p.id && !usedId.has(p.id) && p.k === o.k); if (j >= 0) { usedP.add(j); o.id = prev[j].id; usedId.add(o.id); } });
-  out.forEach(o => { if (o.id || !o.k) return; const id = reg.get(o.k); if (id && !usedId.has(id)) { o.id = id; usedId.add(id); } });
-  out.forEach((o, i) => { if (o.id) return; const p = prev[i]; if (p && p.id && !usedP.has(i) && !usedId.has(p.id)) { usedP.add(i); o.id = p.id; usedId.add(o.id); } });
+  // identita' di ogni riga: 1) stesso codice e stesso nome; 2) stesso nome e girone (codice cambiato, anche negli scambi);
+  // 3) stesso nome; 4) stesso codice (nome cambiato); 5) registro del file; 6) stessa posizione
+  const usedP = new Set(), usedId = new Set(), out = rows.map(r => ({ code: r.code, k: key(r), g: r.gir || '', id: null }));
+  const take = (o, j) => { usedP.add(j); o.id = prev[j].id; usedId.add(o.id); };
+  const pass = test => out.forEach(o => { if (o.id) return; const j = prev.findIndex((p, i) => !usedP.has(i) && p.id && !usedId.has(p.id) && test(o, p)); if (j >= 0) take(o, j); });
+  const named = o => o.k && o.k !== '|';
+  pass((o, p) => o.code === p.code && o.k === p.k);
+  pass((o, p) => named(o) && o.k === p.k && o.g === p.g);
+  pass((o, p) => named(o) && o.k === p.k);
+  pass((o, p) => o.code === p.code);
+  out.forEach(o => { if (o.id || !named(o)) return; const id = reg.get(o.k); if (id && !usedId.has(id)) { o.id = id; usedId.add(id); } });
+  out.forEach((o, i) => { if (o.id) return; const p = prev[i]; if (p && p.id && !usedP.has(i) && !usedId.has(p.id)) take(o, i); });
   return out;
 }
 function snapAll() {
@@ -1458,6 +1517,7 @@ async function importa() {
     $('cfg').value = X.params.join('\n');
     $('po').value = String(X.po.squadre || 0); $('poq').value = X.po.qualificate || ''; $('pog').value = X.po.gironi || '';
     $('narb').value = X.narb || ''; $('nudc').value = X.nudc || ''; $('uni').value = (X.uni || '').split('\n').filter(Boolean).join('; ');
+    $('note').checked = !!X.note; $('prov').checked = !!X.prov;
     $('pp').value = String((X.pp && X.pp.squadre) || 0); $('ppq').value = (X.pp && X.pp.qualificate) || '';
     const tsv = a => a.map(x => (x === undefined || x === null ? '' : String(x)).replace(/[\t\r\n]+/g, ' ')).join('\t');
     const sq = X.data.righe.filter(o => o.t === 'sq'), cp = X.data.righe.filter(o => o.t === 'campo');
@@ -1469,7 +1529,7 @@ async function importa() {
     IMPT = sq.map(o => o.k); IMPF = cp.map(o => o.k);
     sq.forEach(o => { const k = tkey({ name: o.n }); if (k && !TREG.has(k)) TREG.set(k, o.k); });
     cp.forEach(o => { const k = fkey({ name: o.n, link: o.l }); if (k !== '|' && !FREG.has(k)) FREG.set(k, o.k); });
-    TSNAP = sq.map(o => ({ code: o.k, k: tkey({ name: o.n }), id: o.k })); FSNAP = cp.map(o => ({ code: o.k, k: fkey({ name: o.n, link: o.l }), id: o.k }));
+    TSNAP = sq.map(o => ({ code: o.k, k: tkey({ name: o.n }), g: (PFX(o.k) || [])[1] || '', id: o.k })); FSNAP = cp.map(o => ({ code: o.k, k: fkey({ name: o.n, link: o.l }), id: o.k }));
     rep.textContent = X.report.join('\n'); rep.className = 'ok';
     preview();
   } catch (e) { clearImport(); rep.textContent = 'Errore: ' + e.message; rep.className = 'err'; console.error(e); }
@@ -1496,7 +1556,7 @@ $('go').addEventListener('click', async () => {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
     if (syncBoxes()) snapAll(); else onTeams();
-    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim() };
+    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), note: $('note').checked, prov: $('prov').checked };
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
