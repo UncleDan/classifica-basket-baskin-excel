@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.15 - 2026-10-20 09-19-22 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.16 - 2026-10-20 14-25-03 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -1174,7 +1174,7 @@ function extract(M) {
   const S = M.sheets;
   const get = (sh, r, c) => { const R = sh.cells.get(r); return R ? R.get(c) : undefined; };
   const str = v => v === undefined || v === null ? '' : String(v).trim();
-  const camp = S['Campionato']; if (!camp) throw new Error('Manca il foglio Campionato: il file non sembra un campionato Baskin.');
+  const camp = S['Campionato']; if (!camp) throw new Error('manca il foglio "Campionato": il file non e\' nel formato del modello (fogli presenti: ' + M.order.join(', ') + '). Rinominare il foglio con squadre e parametri in "Campionato" e i fogli delle gare in "Calendario ..." oppure ricopiare i dati in un modello.');
   // tipo
   let tipo;
   if (S['Calendario O-E']) tipo = 'Emilia-Romagna Ovest-Est';
@@ -1188,7 +1188,10 @@ function extract(M) {
   const P = { nome: pick('campionato'), logo1: pick('link logo 1', 'ling logo 1'), logo2: pick('link logo 2', 'ling logo 2'), gironiLab: pick('gironi', 'girone'), stagione: pick('stagione'), pv: pick('punti vittoria'), ps: pick('punti sconfitta'), pf: pick('punti forfait'), forf: pick('punteggio forfait'), nomi: pick('nomi gironi') };
   // squadre
   let hdr = 0; for (let r = 1; r <= 40; r++) if (str(get(camp, r, 2)) === '#' && str(get(camp, r, 3)) === 'Squadra') { hdr = r; break; }
-  if (!hdr) throw new Error('Tabella squadre non trovata nel foglio Campionato.');
+  if (!hdr) {
+    let sh = 0; for (let r = 1; r <= 40 && !sh; r++) for (let c = 1; c <= 8; c++) if (str(get(camp, r, c)) === '#' && str(get(camp, r, c + 1)) === 'Squadra') { sh = c; break; }
+    throw new Error(sh ? 'le tabelle del foglio Campionato sono spostate rispetto al modello (la tabella squadre parte dalla colonna ' + String.fromCharCode(64 + sh) + ' invece che dalla B): riportarle nella posizione del modello prima di importare.' : 'tabella squadre non trovata nel foglio Campionato (manca l\'intestazione "#" / "Squadra" in colonna B-C).');
+  }
   const teams = []; // {code,name,pen,gir}
   // modello a girone singolo (es. Veneto): colonna E senza lettere di girone -> un solo girone
   let single = true;
@@ -1259,10 +1262,11 @@ function extract(M) {
   const calRef = [];   // per DESIGNAZIONI: posizione nel nuovo modello di ogni gara letta
   const RK = {};   // giornate di ogni girone nell'ordine del file
   const isPoCode = c => { const v = str(c); return /^[A-Z]{1,3}\d+$/.test(v) && letters.includes(v.replace(/\d+$/, '')) || /^\d+[A-Z]{1,3}$/.test(v) || /^[+-]\d+$/.test(v); };
-  const calPO = [];   // gare di playoff scritte nel foglio Calendario: non sono gare di girone
+  const calPO = [];
+  const numCodesPO = !teams.some(t => /^\d+$/.test(t.code));   // numeri al posto dei codici = gare di playoff solo se i codici squadra non sono numeri   // gare di playoff scritte nel foglio Calendario: non sono gare di girone
   for (const g of cal) {
     let L = null; const ta = teams.find(t => t.code === str(g.a)), tb = teams.find(t => t.code === str(g.b));
-    if (!ta && !tb && (isPoCode(g.a) || isPoCode(g.b) || (/^\d+$/.test(str(g.a)) && /^\d+$/.test(str(g.b))))) { calPO.push(g); calRef.push(null); continue; }
+    if (!ta && !tb && (isPoCode(g.a) || isPoCode(g.b) || (numCodesPO && /^\d+$/.test(str(g.a)) && /^\d+$/.test(str(g.b))))) { calPO.push(g); calRef.push(null); continue; }
     if (ta) L = ta.gir; else if (tb) L = tb.gir; else if (g.bar && letters.includes(g.bar)) L = g.bar;
     if (!L) { calRef.push(null); continue; }
     const k = letters.indexOf(L); const i = ++nGir[L];
@@ -1382,16 +1386,17 @@ function extract(M) {
   const gironi = letters.map((L, k) => ({ name: names[k], nt: Math.max(3, byGir[L].length), color: colors[k], sigla: NEWL[k] }));
   // ---- avvisi: cose da correggere a mano nel file di origine prima di procedere ----
   const warn = [];
+  const nG = n => n === 1 ? '1 gara' : n + ' gare';
   { const sh = calSheets.map(n => S[n]);
     // colonne spostate: righe "Gara N." senza il trattino del risultato in colonna K
     for (const n of calSheets) { const c = S[n]; let ok = 0, ko = 0; for (const [r, R] of c.cells) if (str(R.get(1)) === 'Gara N.') { if (str(R.get(10)) === 'Risultato') ok++; else if ([...R.values()].some(v => str(v) === 'Risultato')) ko++; } if (ko > ok) warn.push('foglio "' + n + '": le colonne del calendario non sono nella posizione del modello (il trattino del risultato non e\' in colonna K); le gare di questo foglio non vengono lette.'); }
     // squadre scritte col nome invece del codice, o codici inesistenti
     const byName = cal.filter(g => (!g.a || !g.b) && g.nameA && g.nameB && !/^\(/.test(g.nameA));
-    if (byName.length) warn.push(byName.length + ' gare con le squadre scritte per nome invece che col codice (es. gara ' + byName.slice(0, 5).map(g => str(g.num) + ' ' + g.nameA + ' - ' + g.nameB).join('; ') + '): non vengono importate.');
+    if (byName.length) warn.push(nG(byName.length) + ' con le squadre scritte per nome invece che col codice (es. gara ' + byName.slice(0, 5).map(g => str(g.num) + ' ' + g.nameA + ' - ' + g.nameB).join('; ') + '): non vengono importate.');
     const badCode = cal.filter(g => !calPO.includes(g)).filter(g => (g.a && !teams.some(t => t.code === str(g.a))) || (g.b && !teams.some(t => t.code === str(g.b))));
-    if (badCode.length) warn.push(badCode.length + ' gare con codici squadra che non esistono nell\'elenco (es. gara ' + badCode.slice(0, 5).map(g => str(g.num) + ' ' + str(g.a) + '-' + str(g.b)).join('; ') + ').');
+    if (badCode.length) warn.push(nG(badCode.length) + ' con codici squadra che non esistono nell\'elenco (es. gara ' + badCode.slice(0, 5).map(g => str(g.num) + ' ' + str(g.a) + '-' + str(g.b)).join('; ') + ').');
     const noTeam = cal.filter(g => !g.a && !g.b && typeof g.ra === 'number' && typeof g.rb === 'number' && g.ra + g.rb > 0 && !(g.nameA && g.nameB));
-    if (noTeam.length) warn.push(noTeam.length + ' gare con il risultato ma senza squadre (es. gara ' + noTeam.slice(0, 5).map(g => str(g.num)).join(', ') + '): il risultato va perso.');
+    if (noTeam.length) warn.push(nG(noTeam.length) + ' con il risultato ma senza squadre (es. gara ' + noTeam.slice(0, 5).map(g => str(g.num)).join(', ') + '): il risultato va perso.');
     // playoff: scritture non riconosciute (3N, +37, -45, codici squadra, nomi)
     for (const P of poAll) {
       const odd = P.gs.filter(g => [g.a, g.b].some(x => { const v = str(x); return v && !/^[A-Z]{1,3}\d+$/.test(v) && !/^\d+$/.test(v); }) || [g.a, g.b].some(x => /^\d+[A-Z]{1,3}$/.test(str(x)) || /^[+-]\d+$/.test(str(x))));
@@ -1402,7 +1407,23 @@ function extract(M) {
     }
     // date scritte come testo (non riconoscibili come data)
     const badD = cal.filter(g => (g.a || g.b) && typeof g.d === 'string' && g.d);
-    if (badD.length) warn.push(badD.length + ' gare con la data scritta come testo e non come data (es. gara ' + badD.slice(0, 5).map(g => str(g.num) + ' "' + g.d + '"').join('; ') + ').');
+    if (badD.length) warn.push(nG(badD.length) + ' con la data scritta come testo e non come data (es. gara ' + badD.slice(0, 5).map(g => str(g.num) + ' "' + g.d + '"').join('; ') + ').');
+    // calendario senza gare compilate
+    if (!cal.some(g => g.a || g.b || g.nameA || typeof g.ra === 'number')) warn.push('il calendario non contiene gare compilate: vengono importati solo squadre, campi e parametri.');
+    // risultati scritti come testo
+    const txtRes = cal.filter(g => [g.ra, g.rb].some(v => v !== undefined && v !== null && v !== '' && typeof v !== 'number'));
+    if (txtRes.length) warn.push(nG(txtRes.length) + ' con il risultato scritto come testo (es. gara ' + txtRes.slice(0, 5).map(g => str(g.num) + ' "' + str(g.ra) + '-' + str(g.rb) + '"').join('; ') + '): il risultato non viene contato.');
+    // fogli con gare che non sono calendari ne' tabelloni riconosciuti
+    const known = new Set([...calSheets, ...poSheets, 'Campionato', 'DESIGNAZIONI', 'Calendario.ics', 'RIEPILOGO', 'Dati', 'Classifica', 'Classifica Finale', 'Note', 'Provvedimenti Disciplinari', 'Arbitri', 'UdC', 'MEMO', 'REGOLAMENTO', 'ESEMPIO CALENDARIO']);
+    for (const n of M.order) if (!known.has(n) && S[n]) { const gs = games(S[n]).filter(g => g.a || g.b || g.nameA || typeof g.ra === 'number'); if (gs.length) warn.push('foglio "' + n + '": ' + nG(gs.length) + ' non importate (il nome del foglio non e\' un calendario ne\' un playoff riconosciuto).'); }
+    // piu' fogli calendario sommati nello stesso girone (es. seconda fase nello stesso file)
+    if (single && calSheets.filter(n => cal.some(g => g.sheet === n && (g.a || g.b))).length > 1) warn.push('piu\' fogli calendario (' + calSheets.join(', ') + ') sommati nello stesso girone: se uno e\' un\'altra fase, va separato in un file a parte.');
+    // gironi che in realta' sono piu' gironi separati (le squadre di un gruppo non incontrano mai quelle dell'altro)
+    for (const L of letters) {
+      const adj = new Map(); for (const g of cal) { const a = str(g.a), b = str(g.b); const ta = teams.find(t => t.code === a), tb = teams.find(t => t.code === b); if (!ta || !tb || ta.gir !== L || tb.gir !== L) continue; if (!adj.has(a)) adj.set(a, new Set()); if (!adj.has(b)) adj.set(b, new Set()); adj.get(a).add(b); adj.get(b).add(a); }
+      const seen = new Set(), comps = []; for (const t of adj.keys()) { if (seen.has(t)) continue; const st = [t], comp = []; seen.add(t); while (st.length) { const x = st.pop(); comp.push(x); for (const y of adj.get(x)) if (!seen.has(y)) { seen.add(y); st.push(y); } } comps.push(comp); }
+      if (comps.length > 1) warn.push('girone ' + L + ': le gare formano ' + comps.length + ' gruppi separati (' + comps.map(c => c.length).join(' + ') + ' squadre) che non si incontrano mai: probabilmente sono gironi diversi nello stesso file, con una sola classifica. Vanno separati (es. un file per girone, o la colonna girone).');
+    }
     // designazioni senza anagrafiche
     if (desN && !S['Arbitri'] && !S['UdC']) warn.push(desN + ' designazioni lette, ma il file non ha i fogli Arbitri e UdC: indicare il numero di arbitri e Ufficiali di Campo (o aggiungere i due fogli al file di origine), altrimenti il foglio DESIGNAZIONI non viene creato e le designazioni vanno perse.');
   }
@@ -1415,7 +1436,7 @@ function extract(M) {
   if (forfNote) report.push(forfNote);
   if (vNotes) report.push(vNotes + ' note scritte nella riga del campo (senza codice campo) portate nel foglio Note.');
   if (B1 && B1.bye) report.push('Playoff a ' + B1.size + ' squadre con ' + B1.bye + ' BYE: le teste di serie migliori passano il primo turno senza giocare; risultati del tabellone collegati alle gare del nuovo modello' + (B1.miss ? ' (' + B1.miss + ' gare non collegate, da reinserire)' : '') + '.');
-  if (calPO.length) report.push(calPO.length + ' gare di playoff scritte nel foglio del calendario: ignorate come gare di girone.');
+  if (calPO.length) report.push(nG(calPO.length) + ' di playoff scritte nel foglio del calendario: ignorate come gare di girone.');
   if (fcList.length) report.push('Squadre fuori classifica (risultati registrati ma non contati, come nel file di origine): ' + fcList.join(', ') + '.');
   for (const [key, lab] of [['nota', 'Note'], ['prov', 'Provvedimenti disciplinari']]) if (xn[key].sheet) report.push(lab + ' lette: ' + xn[key][0] + (xn[key][1] ? ' (' + xn[key][1] + ' senza gara corrispondente)' : '') + '.');
   if (extraFields.length) report.push('Campi non legati a una squadra spostati sui campi neutri: ' + extraFields.join(', ') + '.');
@@ -1630,12 +1651,13 @@ async function importa() {
   if (!FILES.length) return;
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('Il browser non supporta DecompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
-    const list = [], vuoti = [];
+    const list = [], vuoti = [], errs = [];
     for (const f of FILES) {
       rep.textContent = 'Lettura di ' + f.name + '...';
       try { const X = XL.extract(await XL.read(await f.arrayBuffer())); X.file = f.name; list.push(X); }
-      catch (e) { if (e.code === 'VUOTO') { vuoti.push(f.name); continue; } throw new Error(f.name + ': ' + e.message); }
+      catch (e) { if (e.code === 'VUOTO') { vuoti.push(f.name); continue; } errs.push(f.name + ': ' + e.message); }
     }
+    if (errs.length) throw new Error(errs.length > 1 ? errs.length + ' file non importabili (da correggere prima di procedere):\n- ' + errs.join('\n- ') : errs[0]);
     if (!list.length) throw new Error((vuoti.length > 1 ? 'I file scelti non contengono squadre (sono modelli vuoti)' : 'Il file "' + vuoti[0] + '" non contiene squadre (e\' un modello vuoto)') + ': non c\'e\' niente da importare.');
     const X = XL.merge(list);
     if (vuoti.length) X.report = ['File ignorati perche\' non contengono squadre (modelli vuoti): ' + vuoti.join(', ') + '.', ...X.report];
