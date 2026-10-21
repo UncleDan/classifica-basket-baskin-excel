@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.19 - 2026-10-21 14-14-21 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.20 - 2026-10-21 14-43-47 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -72,6 +72,8 @@ code{font:13px ui-monospace,Consolas,monospace}
 <label class="chk" style="margin-top:10px"><input id="ar" type="checkbox" autocomplete="off"> Andata e ritorno: ogni girone ha anche il girone di ritorno, con lo stesso numero di giornate (per i gironi con le giornate copiate dal file di origine vale il file).</label>
 <label style="display:block;margin-top:10px">Calendari unificati (facoltativo)<input id="uni" type="text" value="" placeholder="es. A,B oppure A-B; C-D" autocomplete="off"></label>
 <p class="hint">Gironi che condividono un unico foglio calendario, con le giornate alternate (1A, 1B, 2A, 2B…), come il foglio "Calendario O-E". Gruppi separati da <code>;</code>, gironi del gruppo separati da <code>,</code> (oppure intervallo <code>A-D</code>, secondo l'ordine dei gironi); si usano le sigle. Vuoto = un foglio per girone.</p>
+<label style="display:block;margin-top:10px">Classifiche raggruppate<input id="ucl" type="text" value="" placeholder="vuoto = un foglio per girone" autocomplete="off"></label>
+<p class="hint">Gironi che condividono un unico foglio di classifica, nello stesso formato dei calendari unificati (es. <code>A-D</code> oppure <code>A,B; C-D</code>). Di default ci sono tutti i gironi: un solo foglio "Classifica", dopo i playoff. I gironi non indicati hanno ciascuno il proprio foglio (es. "Classifica A") subito dopo il suo calendario; vuoto = tutti i fogli separati (Calendario A, Classifica A, Calendario B, Classifica B…).</p>
 </section>
 <section class="card">
 <h2>Parametri</h2>
@@ -867,26 +869,48 @@ async function generate(opt) {
     aw.printArea = 'A1:O' + (4 + N);
   }
 
-  // ===== CLASSIFICA =====
-  log('Classifica');
-  const cw = mk('Classifica', 'Classifica');
-  for (let r = 1; r <= 3; r++) copyRow('Classifica', r, cw, r);
-  mergesRows('Classifica', 1, 3, cw, 0);
-  let cbase = 6;
-  for (let k = 0; k < G; k++) {
-    const NT = NTS[k];
-    const L = LET[k], base = cbase, QC = PO && POG.includes(L) && !(BR[0] && BR[0].custom) ? POQ : 0;
-    copyRow('Classifica', 6, cw, base, { L, over: { 1: '="CLASSIFICA - GIRONE "&UPPER(' + gname(L) + ')' } });
-    copyRow('Classifica', 7, cw, base + 1, { L }); copyRow('Classifica', 8, cw, base + 2, { L });
-    mergesRows('Classifica', 6, 8, cw, base - 6);
-    for (let i = 1; i <= NT; i++) { const r = base + 2 + i; const sr = i <= QC ? (i === 1 ? 9 : 10) : 17; copyRow('Classifica', sr, cw, r, { L, over: { 1: L + i }, refrow: r });
-      for (let c = 3; c <= 13; c++) { const x = cw.cell(r, c); if (x.k === 'f') x.v = 'IF(RIGHT($B' + r + ',6)="(f.c.)","-",' + x.v.replace(/^=/, '') + ')'; } }   // fuori classifica: tutti i valori a "-"
-    cw.cf.push('<conditionalFormatting sqref="A' + (base + 3) + ':M' + (base + 2 + NT) + '"><cfRule type="expression" priority="1" dxfId="' + st.YELLOW + '" stopIfTrue="0"><formula>RIGHT($B' + (base + 3) + ',6)="(f.c.)"</formula></cfRule></conditionalFormatting>');
-    cbase += 2 + 1 + NT + 1;
+  // ===== CLASSIFICHE =====
+  // raggruppate come indicato in "Classifiche raggruppate" (non indicato = un solo foglio Classifica con tutti i gironi);
+  // i gironi non indicati hanno ciascuno il proprio foglio, accanto al calendario
+  const CLS = [];   // { name, mem, after }
+  { const used = {}, groups = [];
+    const txt = C.ucl === undefined || C.ucl === null ? LET.join(',') : String(C.ucl);
+    for (const line of txt.toUpperCase().split(/[\n;|]+/)) {
+      let mem = []; for (const x of line.split(/[,\s+\/]+/).filter(Boolean)) mem.push(...rangeOf(x));
+      mem = [...new Set(mem)]; if (!mem.length) continue;
+      for (const L of mem) { if (!LET.includes(L)) throw new Error('Classifiche raggruppate: il girone ' + L + ' non esiste.'); if (used[L]) throw new Error('Classifiche raggruppate: il girone ' + L + ' compare in due gruppi.'); used[L] = 1; }
+      groups.push(mem.map(L => LET.indexOf(L)).sort((a, b) => a - b));
+    }
+    for (let k = 0; k < G; k++) if (!used[LET[k]]) groups.push([k]);
+    groups.sort((a, b) => a[0] - b[0]);
+    for (const mem of groups) {
+      const Ls = mem.map(i => LET[i]), all = mem.length === G, contig = mem.every((x, i) => i === 0 || x === mem[i - 1] + 1);
+      let name = all ? 'Classifica' : 'Classifica ' + (mem.length === 1 ? Ls[0] : contig ? Ls[0] + '-' + Ls[Ls.length - 1] : Ls.join(','));
+      if (name.length > 31) name = 'Classifica ' + Ls[0] + '+' + (Ls.length - 1);
+      CLS.push({ name, mem, all, after: all ? null : CSH[Math.max(...mem.map(k => SHK[k]))].name });
+    } }
+  for (const g of CLS) {
+    log(g.name);
+    const cw = mk(g.name, 'Classifica'); if (g.mem.length === 1) cw.tab = PAL[LET[g.mem[0]]][0];
+    for (let r = 1; r <= 3; r++) copyRow('Classifica', r, cw, r);
+    if (g.mem.length === 1) cw.set(3, 1, '="Classifica del girone "&' + gname(LET[g.mem[0]]) + '&" - Stagione "&Campionato!$D$6');
+    mergesRows('Classifica', 1, 3, cw, 0);
+    let cbase = 6;
+    for (const k of g.mem) {
+      const NT = NTS[k];
+      const L = LET[k], base = cbase, QC = PO && POG.includes(L) && !(BR[0] && BR[0].custom) ? POQ : 0;
+      copyRow('Classifica', 6, cw, base, { L, over: { 1: '="CLASSIFICA - GIRONE "&UPPER(' + gname(L) + ')' } });
+      copyRow('Classifica', 7, cw, base + 1, { L }); copyRow('Classifica', 8, cw, base + 2, { L });
+      mergesRows('Classifica', 6, 8, cw, base - 6);
+      for (let i = 1; i <= NT; i++) { const r = base + 2 + i; const sr = i <= QC ? (i === 1 ? 9 : 10) : 17; copyRow('Classifica', sr, cw, r, { L, over: { 1: L + i }, refrow: r });
+        for (let c = 3; c <= 13; c++) { const x = cw.cell(r, c); if (x.k === 'f') x.v = 'IF(RIGHT($B' + r + ',6)="(f.c.)","-",' + x.v.replace(/^=/, '') + ')'; } }   // fuori classifica: tutti i valori a "-"
+      cw.cf.push('<conditionalFormatting sqref="A' + (base + 3) + ':M' + (base + 2 + NT) + '"><cfRule type="expression" priority="1" dxfId="' + st.YELLOW + '" stopIfTrue="0"><formula>RIGHT($B' + (base + 3) + ',6)="(f.c.)"</formula></cfRule></conditionalFormatting>');
+      cbase += 2 + 1 + NT + 1;
+    }
+    const CEND = cbase, qg = g.mem.map(k => LET[k]).filter(L => POG.includes(L));
+    copyRow('Classifica', 21, cw, CEND + 1, { over: { 1: PO && qg.length && !(BR[0] && BR[0].custom) ? 'Legenda: sfondo colorato = squadre qualificate al playoff a ' + PO + ' (prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + ').' : (g.mem.length > 1 ? 'Classifiche di girone.' : 'Classifica del girone.') } });
+    cw.printArea = 'A1:M' + (CEND + 2);
   }
-  const CEND = cbase;
-  copyRow('Classifica', 21, cw, CEND + 1, { over: { 1: PO && !(BR[0] && BR[0].custom) ? 'Legenda: sfondo colorato = squadre qualificate al playoff a ' + PO + ' (prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + ').' : 'Classifiche di girone.' } });
-  cw.printArea = 'A1:M' + (CEND + 2);
 
   // ===== CLASSIFICA FINALE =====
   log('Classifica Finale');
@@ -1034,7 +1058,8 @@ async function generate(opt) {
 
   // ===== ordine e pacchetto =====
   // RIEPILOGO e' sempre l'ultimo foglio (ed e' l'unico col nome tutto maiuscolo)
-  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'Designazioni', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Note', 'Provvedimenti Disciplinari', 'Dati', 'RIEPILOGO'];
+  // classifiche separate subito dopo il calendario del loro ultimo girone; quella con tutti i gironi dopo i playoff
+  const order = ['Campionato', ...CSH.flatMap(c => [c.name, ...CLS.filter(g => g.after === c.name).map(g => g.name)]), ...BR.map(B => B.sheet), ...CLS.filter(g => g.all).map(g => g.name), 'Classifica Finale', 'Designazioni', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Note', 'Provvedimenti Disciplinari', 'Dati', 'RIEPILOGO'];
   // senza arbitri e Ufficiali di Campo il foglio Designazioni non serve
   const list = order.filter(nm => nm !== 'Designazioni' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
   for (const sh of list) for (const Rw of sh.rows.values()) for (const x of Rw.cells.values()) if (x.k === 'f' && /DESIGNAZIONI/.test(x.v)) x.v = x.v.replace(/'?DESIGNAZIONI'?!/g, 'Designazioni!');
@@ -1613,7 +1638,7 @@ function extract(M) {
     const txtRes = cal.filter(g => [g.ra, g.rb].some(v => v !== undefined && v !== null && v !== '' && typeof v !== 'number'));
     if (txtRes.length) warn.push(nG(txtRes.length) + ' con il risultato scritto come testo (es. gara ' + txtRes.slice(0, 5).map(g => str(g.num) + ' "' + str(g.ra) + '-' + str(g.rb) + '"').join('; ') + '): il risultato non viene contato.');
     // fogli con gare che non sono calendari ne' tabelloni riconosciuti
-    const known = new Set([...calSheets, ...poSheets, 'Campionato', 'DESIGNAZIONI', 'Designazioni', 'Calendario.ics', 'RIEPILOGO', 'Dati', 'Classifica', 'Classifica Finale', 'Note', 'Provvedimenti Disciplinari', 'Arbitri', 'UdC', 'MEMO', 'REGOLAMENTO', 'ESEMPIO CALENDARIO']);
+    const known = new Set([...calSheets, ...poSheets, 'Campionato', 'DESIGNAZIONI', 'Designazioni', ...M.order.filter(n => /^Classifica /.test(n)), 'Calendario.ics', 'RIEPILOGO', 'Dati', 'Classifica', 'Classifica Finale', 'Note', 'Provvedimenti Disciplinari', 'Arbitri', 'UdC', 'MEMO', 'REGOLAMENTO', 'ESEMPIO CALENDARIO']);
     for (const n of M.order) if (!known.has(n) && S[n]) { const gs = games(S[n]).filter(g => g.a || g.b || g.nameA || typeof g.ra === 'number'); if (gs.length) warn.push('foglio "' + n + '": ' + nG(gs.length) + ' non importate (il nome del foglio non e\' un calendario ne\' un playoff riconosciuto).'); }
     // piu' fogli calendario sommati nello stesso girone (es. seconda fase nello stesso file)
     if (single && calSheets.filter(n => cal.some(g => g.sheet === n && (g.a || g.b))).length > 1) warn.push('piu\' fogli calendario (' + calSheets.join(', ') + ') sommati nello stesso girone: se uno e\' un\'altra fase, va separato in un file a parte.');
@@ -1642,7 +1667,13 @@ function extract(M) {
   if (extraFields.length) report.push('Campi non legati a una squadra spostati sui campi neutri: ' + extraFields.join(', ') + '.');
   const uni = Object.values(uniS).filter(x => x.size > 1).map(x => [...x].sort((p, q) => NEWL.indexOf(p) - NEWL.indexOf(q)).join(','));
   if (uni.length) report.push('Calendari unificati: ' + uni.join('; ') + '.');
-  return { tipo, gironi, params, po, pp, narb, nudc, warn, note: !!xn.nota.sheet || vNotes > 0, prov: !!xn.prov.sheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
+  // classifiche separate o raggruppate (fogli "Classifica A", "Classifica B-C"...): stessi gruppi; un solo foglio Classifica = tutti insieme
+  let ucl = null;
+  { const gs = []; for (const n of M.order) { const m = /^Classifica (?!Finale)(.+)$/.exec(n); if (!m) continue;
+      const mem = []; for (const x of m[1].split(',')) { const r = /^([A-Z]{1,3})-([A-Z]{1,3})$/.exec(x.trim()); if (r && letters.includes(r[1]) && letters.includes(r[2])) { for (let i = letters.indexOf(r[1]); i <= letters.indexOf(r[2]); i++) mem.push(letters[i]); } else if (letters.includes(x.trim())) mem.push(x.trim()); }
+      if (mem.length > 1) gs.push(mem.map(L => NEWL[letters.indexOf(L)]).join(',')); }
+    if (M.order.some(n => /^Classifica (?!Finale)/.test(n))) ucl = gs.join('; '); }
+  return { tipo, gironi, params, po, pp, narb, nudc, warn, ucl, note: !!xn.nota.sheet || vNotes > 0, prov: !!xn.prov.sheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
 }
 
 // ---------------- fusione di piu' file ----------------
@@ -1722,7 +1753,8 @@ if (typeof module !== 'undefined') module.exports = XL;
 const $ = id => document.getElementById(id);
 // ---------- valori iniziali (anche dopo Reset; il browser non deve riproporre valori vecchi) ----------
 const DEF = { gironi: 'Gold, 10, gold', cfg: ['Campionato Baskin', '', '', 'A', '2026/2027', '3', '1', '0', '40-0', 'Gold'].join('\n'), uni: '', po: '8', poq: '8', pog: '', pp: '0', ppq: '', narb: '', nudc: '', teams: '', fields: '', fc: '' };
-function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('warn').textContent = ''; }
+let UCL_AUTO = '';
+function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('ucl').value = UCL_AUTO = allG(); $('warn').textContent = ''; }
 setDefaults();
 function preview() {
   const { gironi, err } = GEN.parseGironi($('gironi').value); const S = GEN.sigle(gironi); let h = '';
@@ -1793,6 +1825,7 @@ function syncBoxes() {   // true se sono cambiati sigle, ordine o gironi inclusi
   const tok = txt => txt.replace(/\b[A-Z]{1,3}\b/g, L => { const r = conv(L); return r.out ? '' : r.s; }).replace(/\s*,\s*(?=,|$)/g, '').replace(/^[,;\s-]+|[,;\s-]+$/g, '').replace(/,{2,}/g, ',');
   $('pog').value = tok($('pog').value);
   $('uni').value = $('uni').value.split(';').map(g => tok(g.trim())).filter(g => /[A-Z].*[,\-+\s].*[A-Z]/.test(g)).join('; ');
+  $('ucl').value = $('ucl').value.split(';').map(g => tok(g.trim())).filter(g => /[A-Z]/.test(g)).join('; ');
   CURMAP = NEW;
   return true;
 }
@@ -1829,7 +1862,10 @@ function onTeams() {   // codice squadra cambiato: il campo di casa lo segue (sc
   for (const id of ['fields', 'fc']) $(id).value = $(id).value.split('\n').map(line => { if (!line.trim()) return line; const { sep, p } = splitL(line); const c = p[0].trim().toUpperCase(); if (ren[c]) p[0] = ren[c]; return p.join(sep); }).join('\n');
   FSNAP = matchSnap(FSNAP, GEN.parseFields($('fields').value).rows, fkey, FREG);
 }
-$('gironi').addEventListener('change', () => { if (syncBoxes()) snapAll(); });
+// classifiche raggruppate: finche' il campo contiene tutti i gironi (il default) segue i gironi aggiunti o tolti
+function allG() { try { const S = GEN.sigle(GEN.parseGironi($('gironi').value).gironi); return S.length > 2 ? S[0] + '-' + S[S.length - 1] : S.join(','); } catch (e) { return ''; } }
+function gironiSync() { const was = $('ucl').value.trim() === UCL_AUTO; const ch = syncBoxes(); const a = allG(); if (was) $('ucl').value = a; UCL_AUTO = a; return ch; }
+$('gironi').addEventListener('change', () => { if (gironiSync()) snapAll(); });
 $('teams').addEventListener('change', onTeams);
 $('fields').addEventListener('change', () => { if (IMPORTED) FSNAP = matchSnap(FSNAP, GEN.parseFields($('fields').value).rows, fkey, FREG); });
 function codeMaps() {
@@ -1862,6 +1898,7 @@ async function importa() {
     const X = XL.merge(list);
     if (vuoti.length) X.report = ['File ignorati perche\' non contengono squadre (modelli vuoti): ' + vuoti.join(', ') + '.', ...X.report];
     $('gironi').value = X.gironi.map((g, i) => g.name + ', ' + g.nt + ', ' + (g.color || GEN.DEFAULT_COLORS[i % GEN.DEFAULT_COLORS.length]) + ', ' + g.sigla).join('\n');
+    UCL_AUTO = allG(); $('ucl').value = X.ucl != null ? X.ucl : UCL_AUTO;
     $('cfg').value = X.params.join('\n');
     $('po').value = String(X.po.squadre || 0); $('poq').value = X.po.qualificate || ''; $('pog').value = X.po.gironi || '';
     $('narb').value = X.narb || ''; $('nudc').value = X.nudc || ''; $('uni').value = (X.uni || '').split('\n').filter(Boolean).join('; ');
@@ -1905,8 +1942,8 @@ $('go').addEventListener('click', async () => {
   try {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
-    if (syncBoxes()) snapAll(); else onTeams();
-    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), note: $('note').checked, prov: $('prov').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked };
+    if (gironiSync()) snapAll(); else onTeams();
+    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), ucl: $('ucl').value.trim(), note: $('note').checked, prov: $('prov').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked };
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err, ...GEN.applyFC($('fc').value, T.rows)].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
