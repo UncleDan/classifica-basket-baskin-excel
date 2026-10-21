@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.18) sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.19) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 
@@ -34,7 +34,7 @@ Dalla Release 1.18 i tabelloni con schemi diversi dal modello si importano per l
 - [ ] **VENETO Girone Est 2024/2025**: tabellone con squadre di altri gironi e dati incoerenti (la stessa squadra gioca tutte le gare): 2 gare da compilare a mano.
 - [ ] **FVG Girone A 2023/2024 e Girone 1 seconda fase**: semifinali con squadre di altri gironi, da compilare a mano.
 - [ ] **PUGLIA - Girone A & Playoff 2023/2024**: verificare le squadre del girone B riconosciute dal nome.
-- [ ] **Andata e ritorno nel playoff** (Lombardia Sud): importato con lo schema di origine; il passaggio del turno non si calcola da solo.
+- [x] **Andata e ritorno nel playoff** (Lombardia Sud): dalla Release 1.19 per ogni sfida il totale delle due gare e la squadra che passa (differenza canestri; in parità si indica a mano).
 
 ### File da non importare
 
@@ -64,6 +64,7 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 - [ ] **3.10 Gare con una sola squadra**: oggi non contano per nessuno (Piemonte Rosso 2025/2026, Toscana 2023/2024). Da confermare.
 - [x] **3.11 Fuori classifica**: casella dedicata nel generatore (una squadra per riga), S in colonna FC del foglio Campionato, squadre in fondo alla classifica in ordine alfabetico, in giallo e con i valori a "-"; nel RIEPILOGO colonne Esiti Speciali e FC (A, B, AB). Fatto nella Release 1.17.
 - [x] **3.12 Import dei playoff con schemi particolari** (3N, +37/-45, codici squadra, nomi, andata e ritorno, gare nel calendario): fatto nella Release 1.18.
+- [x] **3.13 Playoff con andata e ritorno** (differenza canestri, parità decisa a mano, finali in gara unica): fatto nella Release 1.19.
 
 ## 4. Altro
 
