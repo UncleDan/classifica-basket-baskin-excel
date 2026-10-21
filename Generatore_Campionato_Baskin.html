@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.17 - 2026-10-21 12-09-56 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.18 - 2026-10-21 14-02-59 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -94,7 +94,7 @@ code{font:13px ui-monospace,Consolas,monospace}
 <label>Qualificate per girone<input id="ppq" type="number" autocomplete="off" min="1" max="40" value=""></label>
 </div>
 <h2 style="margin-top:14px">Anagrafiche</h2>
-<p class="hint">Righe dei fogli Arbitri e UdC. Se il campo è vuoto il foglio non viene creato e le designazioni si scrivono a mano; se sono vuoti tutti e due non viene creato neanche il foglio DESIGNAZIONI.</p>
+<p class="hint">Righe dei fogli Arbitri e UdC. Se il campo è vuoto il foglio non viene creato e le designazioni si scrivono a mano; se sono vuoti tutti e due non viene creato neanche il foglio Designazioni.</p>
 <div class="grid2">
 <label>Arbitri<input id="narb" type="number" autocomplete="off" min="0" max="2000" value=""></label>
 <label>Ufficiali di Campo<input id="nudc" type="number" autocomplete="off" min="0" max="2000" value=""></label>
@@ -348,15 +348,21 @@ async function generate(opt) {
   const rangeOf = x => { const m = /^([A-Z]{1,3})-([A-Z]{1,3})$/.exec(x); if (!m || !LET.includes(m[1]) || !LET.includes(m[2])) return [x]; const a = LET.indexOf(m[1]), b = LET.indexOf(m[2]); return LET.slice(Math.min(a, b), Math.max(a, b) + 1); };
   let POG = (C.pog || LET.join(',')).toUpperCase().split(/[,\s;]+/).filter(Boolean).flatMap(rangeOf);
   for (const L of POG) if (!LET.includes(L)) throw new Error('Playoff gironi: il girone ' + L + ' non esiste.');
-  const POQ = PO ? (C.poq ? +C.poq : PO / POG.length) : 0;
-  if (PO && (POQ * POG.length !== PO || POQ < 1)) throw new Error('Playoff: qualificate per girone x numero di gironi deve dare ' + PO + ' (ora ' + POQ + ' x ' + POG.length + ').');
-  if (PO) for (const L of POG) if (POQ > NTS[LET.indexOf(L)]) throw new Error('Playoff: il girone ' + L + ' ha meno di ' + POQ + ' squadre.');
+  // tabellone importato con lo schema del file di origine: squadre fisse, le qualificate per girone non servono
+  const hasSch = (w, n) => !!(n && opt.data && Array.isArray(opt.data.righe) && opt.data.righe.some(o => o.t === 'poschema' && o.w === w && +o.P === n));
+  const minNT = Math.min(...POG.map(L => NTS[LET.indexOf(L)]));
+  const fitQ = n => Math.max(1, Math.min(Math.ceil(n / POG.length), minNT));
+  const CUSPO = hasSch('po', PO);
+  const POQ = PO ? (CUSPO ? fitQ(PO) : C.poq ? +C.poq : PO / POG.length) : 0;
+  if (PO && !CUSPO && (POQ * POG.length !== PO || POQ < 1)) throw new Error('Playoff: qualificate per girone x numero di gironi deve dare ' + PO + ' (ora ' + POQ + ' x ' + POG.length + ').');
+  if (PO && !CUSPO) for (const L of POG) if (POQ > NTS[LET.indexOf(L)]) throw new Error('Playoff: il girone ' + L + ' ha meno di ' + POQ + ' squadre.');
   const PP = C.pp === undefined || C.pp === '' ? 0 : +C.pp;
   if (!okN(PP)) throw new Error('Torneo Primavera: le squadre devono essere 0 oppure da 2 a 64.');
   if (PP && !PO) throw new Error('Il Torneo Primavera richiede il playoff principale.');
-  const PPQ = PP ? (C.ppq ? +C.ppq : PP / POG.length) : 0;
-  if (PP && (PPQ * POG.length !== PP || PPQ < 1)) throw new Error('Torneo Primavera: qualificate per girone x numero di gironi deve dare ' + PP + ' (ora ' + PPQ + ' x ' + POG.length + ').');
-  if (PP) for (const L of POG) if (POQ + PPQ > NTS[LET.indexOf(L)]) throw new Error('Torneo Primavera: il girone ' + L + ' ha meno di ' + (POQ + PPQ) + ' squadre.');
+  const CUSPP = hasSch('po2', PP);
+  const PPQ = PP ? (CUSPP ? Math.max(0, Math.min(Math.ceil(PP / POG.length), minNT - POQ)) : C.ppq ? +C.ppq : PP / POG.length) : 0;
+  if (PP && !CUSPP && (PPQ * POG.length !== PP || PPQ < 1)) throw new Error('Torneo Primavera: qualificate per girone x numero di gironi deve dare ' + PP + ' (ora ' + PPQ + ' x ' + POG.length + ').');
+  if (PP && !CUSPP) for (const L of POG) if (POQ + PPQ > NTS[LET.indexOf(L)]) throw new Error('Torneo Primavera: il girone ' + L + ' ha meno di ' + (POQ + PPQ) + ' squadre.');
   const NARB = Math.max(0, parseInt(C.narb, 10) || 0), NUDC = Math.max(0, parseInt(C.nudc, 10) || 0);   // 0 o vuoto = foglio non creato
 
   // dimensioni
@@ -594,21 +600,26 @@ async function generate(opt) {
     log(sheet);
     // con un numero di squadre che non e' una potenza di 2 il tabellone si completa con dei BYE (come nel tennis):
     // le teste di serie migliori passano il primo turno senza giocare
-    const P2 = (() => { let x = 2; while (x < P) x *= 2; return x; })();
-    const B = { sheet, P, P2, PG: [], PBAR: [], SECT: [], PNOTE: 0, imp: false, lab, bye: new Set() };
+    // schema importato da un file di origine con un tabellone diverso dal modello: sezioni e gare come nel file, squadre fisse
+    const SCH = DATA_RIGHE ? DATA_RIGHE.find(o => o.t === 'poschema' && o.w === (sheet === 'Playoff' ? 'po' : 'po2') && +o.P === P && Array.isArray(o.sect) && o.sect.length) : null;
+    const P2 = SCH ? (SCH.sect[SCH.sect.length - 1].fin && SCH.sect[SCH.sect.length - 1].ng === 2 ? 4 : 2) : (() => { let x = 2; while (x < P) x *= 2; return x; })();
+    const B = { sheet, P, P2, PG: [], PBAR: [], SECT: [], PNOTE: 0, imp: false, lab, bye: new Set(), custom: SCH ? SCH.mode || 'squadre' : '' };
     const pw = B.sh = mk(sheet, 'Playoff');
     for (let r = 1; r <= 7; r++) copyRow('Playoff', r, pw, r);
     pw.set(3, 1, '="' + TOP + ' A ' + P + ' SQUADRE - Stagione "&Campionato!$D$6');
     mergesRows('Playoff', 1, 7, pw, 0);
     const SECT = B.SECT, PG = B.PG;
-    for (let n = P2; n >= 4; n /= 2) SECT.push({ title: RN[n][0], lab: RN[n][1], ng: n / 2, n });
-    SECT.push({ title: P2 >= 4 ? 'FINALI' : 'FINALE', lab: 'Finali', ng: P2 >= 4 ? 2 : 1, n: 2, fin: true });
+    if (SCH) SCH.sect.forEach(x => SECT.push({ title: String(x.title || 'PLAYOFF'), lab: x.fin ? 'Finali' : String(x.rname || x.title || 'Playoff'), rname: x.rname, ng: Math.max(1, x.ng | 0), n: x.fin ? 2 : (x.n | 0), fin: !!x.fin }));
+    else {
+      for (let n = P2; n >= 4; n /= 2) SECT.push({ title: RN[n][0], lab: RN[n][1], ng: n / 2, n });
+      SECT.push({ title: P2 >= 4 ? 'FINALI' : 'FINALE', lab: 'Finali', ng: P2 >= 4 ? 2 : 1, n: 2, fin: true });
+    }
     // teste di serie: prima per posizione, poi per girone
     const seeds = []; for (let p = rank0 + 1; p <= rank0 + Q; p++) for (const L of POG) seeds.push(L + p);
     let cur = 8;
     for (const s of SECT) {
       const bar = cur; B.PBAR.push(bar);
-      copyRow('Playoff', 8, pw, bar, { over: { 2: TOP + ' A ' + P + ' - ' + s.title } }); pw.merge('B' + bar + ':L' + bar);
+      copyRow('Playoff', 8, pw, bar, { over: { 2: SCH ? (/PLAY.?OFF|PRIMAVERA/i.test(s.title) ? s.title : TOP + ' - ' + s.title) : TOP + ' A ' + P + ' - ' + s.title } }); pw.merge('B' + bar + ':L' + bar);
       const lst = []; for (let i = 0; i < s.ng; i++) lst.push([bar + 1 + 3 * i, bar + 2 + 3 * i, bar + 3 + 3 * i]);
       PG.push(lst); cur = bar + 1 + 3 * s.ng + 1;
     }
@@ -617,12 +628,15 @@ async function generate(opt) {
     SECT.forEach((s, si) => {
       PG[si].forEach(([hdr, gr, vr], i) => {
         let over, bye = false;
-        if (si === 0 && !s.fin) { bye = P2 - 1 - i >= P; over = bye ? { 2: vl('C' + gr), 3: seeds[i], 4: 'BYE', 5: '', 27: '=$B' + gr, 28: '' } : { 2: vl('C' + gr), 3: seeds[i], 4: vl('E' + gr), 5: seeds[P2 - 1 - i] }; }
+        const look = c => '=IF($' + c + gr + '="","",IFERROR(VLOOKUP($' + c + gr + ',Campionato!$B$' + T1 + ':$H$' + T2 + ',7,FALSE),IFERROR(VLOOKUP($' + c + gr + ',Campionato!$G$' + T1 + ':$H$' + T2 + ',2,FALSE),"("&$' + c + gr + '&")")))';
+        if (SCH) over = { 2: look('C'), 3: '', 4: look('E'), 5: '' };   // codice squadra oppure girone e posizione (es. A3) in C ed E
+        else if (si === 0 && !s.fin) { bye = P2 - 1 - i >= P; over = bye ? { 2: vl('C' + gr), 3: seeds[i], 4: 'BYE', 5: '', 27: '=$B' + gr, 28: '' } : { 2: vl('C' + gr), 3: seeds[i], 4: vl('E' + gr), 5: seeds[P2 - 1 - i] }; }
         else if (s.fin && P2 === 2) over = { 2: vl('C' + gr), 3: seeds[0], 4: vl('E' + gr), 5: seeds[1] };
         else if (!s.fin) { const prev = PG[si - 1], m = prev.length; const pg = prev[i][1], qg = prev[m - 1 - i][1]; over = { 2: '=AA' + pg, 3: '=A' + pg, 4: '=AA' + qg, 5: '=A' + qg }; }
         else { const col = i === 0 ? 'AB' : 'AA'; const a = PG[last - 1][0][1], b = PG[last - 1][1][1]; over = { 2: '=' + col + a, 3: '=A' + a, 4: '=' + col + b, 5: '=A' + b }; }
         over[1] = (si === 0 && i === 0) ? first : '=MAX(A$10:A' + hdr + ')+1';
-        over[29] = !s.fin ? '=IF($B' + gr + '="","","[' + lab + ' - ' + s.lab + ']")'
+        over[29] = SCH ? '=IF($B' + gr + '="","","[' + lab + ' - ' + (s.fin ? (s.ng === 2 && i === 0 ? 'Finale 3-4' : 'Finale 1-2') : String(s.lab).replace(/"/g, '')) + ']")'
+          : !s.fin ? '=IF($B' + gr + '="","","[' + lab + ' - ' + s.lab + ']")'
           : P2 === 2 ? '=IF($B' + gr + '="","","[' + lab + ' - Finale 1-2]")'
           : '=IF($B' + gr + '="","","[' + lab + ' - Finale "&IF(COUNT($A$' + PG[last][0][0] + ':$A' + hdr + ')=0,"3-4","1-2")&"]")';
         for (let q = 0; q < 3; q++) copyRow('Playoff', 12 + q, pw, hdr + q, { over: q === 1 ? over : (q === 2 && bye ? { 9: '' } : null) });
@@ -635,6 +649,8 @@ async function generate(opt) {
       'Primo turno: ' + Array.from({ length: Math.max(1, P2 / 2) }, (_, i) => seeds[i] + '-' + (P2 - 1 - i >= P ? 'BYE' : seeds[P2 - 1 - i])).join(', ') + (P2 > P ? ' (BYE = passa il turno senza giocare)' : '') + ' (teste di serie: prima la posizione, poi la lettera del girone; la prima incontra l\'ultima, la seconda la penultima, e cosi\' via).',
       'Turni successivi: vincente della gara 1 contro vincente dell\'ultima gara del turno, 2 contro penultima, e cosi\' via.' + (P2 >= 4 ? ' Finali: perdenti semifinali = finale 3o-4o posto; vincenti = finale 1o-2o posto.' : ''),
       'Sfondo verde: campo ancora da definire (codice TBD).'];
+    if (SCH) notes.splice(0, 3, TOP.charAt(0) + TOP.slice(1).toLowerCase() + ' importato con lo schema del file di origine (' + SECT.map(x => x.title.toLowerCase() + ': ' + (x.ng === 1 ? '1 gara' : x.ng + ' gare')).join('; ') + ').',
+      'Squadre scritte gara per gara nelle colonne C ed E (codice squadra, oppure girone e posizione come A3): i turni successivi non si ricavano da soli, salvo le gare collegate a vincente o perdente di una gara precedente.' + (B.custom === 'vuota' ? ' Griglia vuota: squadre e risultati da scrivere a mano.' : ''));
     notes.forEach((t, i) => copyRow('Playoff', 39 + Math.min(i, 3), pw, cur + 1 + i, { over: { 1: t } }));
     B.PNOTE = cur + 1;
     pw.printArea = 'A1:L' + (cur + notes.length);
@@ -737,7 +753,7 @@ async function generate(opt) {
       const X = "'" + B.sheet + "'!", pre = B.sheet === 'Playoff' ? 'Playoff - ' : B.sheet + ' - ';
       B.SECT.forEach((sct, si) => B.PG[si].forEach(([hdr, gr], i) => {
         common(X, gr);
-        put(5, pre + (!sct.fin ? RNAME[sct.n] : B.P === 2 ? 'Finale' : i === 0 ? 'Finale 3°-4° posto' : 'Finale 1°-2° posto'));
+        put(5, pre + (!sct.fin ? (sct.rname || RNAME[sct.n]) : sct.ng === 1 ? 'Finale' : i === 0 ? 'Finale 3°-4° posto' : 'Finale 1°-2° posto'));
         r++;
       }));
     }
@@ -745,8 +761,8 @@ async function generate(opt) {
   }
 
   // ===== DESIGNAZIONI =====
-  log('DESIGNAZIONI');
-  const dsw = mk('DESIGNAZIONI', 'DESIGNAZIONI');
+  log('Designazioni');
+  const dsw = mk('Designazioni', 'DESIGNAZIONI');
   for (let r = 1; r <= 7; r++) copyRow('DESIGNAZIONI', r, dsw, r);
   mergesRows('DESIGNAZIONI', 1, 7, dsw, 0);
   const DESGAME = [];
@@ -814,7 +830,7 @@ async function generate(opt) {
   let cbase = 6;
   for (let k = 0; k < G; k++) {
     const NT = NTS[k];
-    const L = LET[k], base = cbase, QC = PO && POG.includes(L) ? POQ : 0;
+    const L = LET[k], base = cbase, QC = PO && POG.includes(L) && !(BR[0] && BR[0].custom) ? POQ : 0;
     copyRow('Classifica', 6, cw, base, { L, over: { 1: '="CLASSIFICA - GIRONE "&UPPER(' + gname(L) + ')' } });
     copyRow('Classifica', 7, cw, base + 1, { L }); copyRow('Classifica', 8, cw, base + 2, { L });
     mergesRows('Classifica', 6, 8, cw, base - 6);
@@ -824,7 +840,7 @@ async function generate(opt) {
     cbase += 2 + 1 + NT + 1;
   }
   const CEND = cbase;
-  copyRow('Classifica', 21, cw, CEND + 1, { over: { 1: PO ? 'Legenda: sfondo colorato = squadre qualificate al playoff a ' + PO + ' (prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + ').' : 'Classifiche di girone.' } });
+  copyRow('Classifica', 21, cw, CEND + 1, { over: { 1: PO && !(BR[0] && BR[0].custom) ? 'Legenda: sfondo colorato = squadre qualificate al playoff a ' + PO + ' (prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + ').' : 'Classifiche di girone.' } });
   cw.printArea = 'A1:M' + (CEND + 2);
 
   // ===== CLASSIFICA FINALE =====
@@ -836,13 +852,13 @@ async function generate(opt) {
   const crow = (sr, dr, over) => { copyRow('Classifica Finale', sr, fw, dr, { over }); mergesRowSingle('Classifica Finale', sr, fw, dr); };
   let r = 7, base0 = 0;
   for (const B of BR) {
-    const FIN = B.PG[B.PG.length - 1], X = "='" + B.sheet + "'!", suf = B.sheet === 'Playoff' ? '' : ' (' + B.lab + ')';
+    const LS = B.PG[B.PG.length - 1], FIN = B.custom && !B.SECT[B.SECT.length - 1].fin ? [LS[LS.length - 1]] : LS, X = "='" + B.sheet + "'!", suf = B.sheet === 'Playoff' ? '' : ' (' + B.lab + ')';
     if (B.P2 >= 4) {
       crow(7, r++, { 1: base0 + 1, 2: X + 'AA' + FIN[1][1], 3: 'Vincente finale 1o-2o posto' + suf });
       crow(8, r++, { 1: base0 + 2, 2: X + 'AB' + FIN[1][1], 3: 'Perdente finale 1o-2o posto' + suf });
       crow(9, r++, { 1: base0 + 3, 2: X + 'AA' + FIN[0][1], 3: 'Vincente finale 3o-4o posto' + suf });
       crow(10, r++, { 1: base0 + 4, 2: X + 'AB' + FIN[0][1], 3: 'Perdente finale 3o-4o posto' + suf });
-      for (let si = B.SECT.length - 3; si >= 0; si--) { const s = B.SECT[si]; for (const [h, gr] of B.PG[si]) if (!B.bye.has(gr)) crow(11, r++, { 1: base0 + s.n / 2 + 1, 2: X + 'AB' + gr, 3: LOSE[s.n] + suf }); }
+      for (let si = B.SECT.length - (B.custom ? 2 : 3); si >= 0; si--) { const s = B.SECT[si]; if (B.custom && (!LOSE[s.n] || si === B.SECT.length - 2)) continue; for (const [h, gr] of B.PG[si]) if (!B.bye.has(gr)) crow(11, r++, { 1: base0 + s.n / 2 + 1, 2: X + 'AB' + gr, 3: LOSE[s.n] + suf }); }
     } else {
       crow(7, r++, { 1: base0 + 1, 2: X + 'AA' + FIN[0][1], 3: 'Vincente finale' + suf });
       crow(8, r++, { 1: base0 + 2, 2: X + 'AB' + FIN[0][1], 3: 'Perdente finale' + suf });
@@ -869,7 +885,7 @@ async function generate(opt) {
     const rowByCode = {}; for (let k = 0; k < G; k++) for (let j = 0; j < NTS[k]; j++) rowByCode[code(k, j)] = T1 + TS[k] + j;
     const fieldRow = {}; for (let k = 0; k < G; k++) for (let j = 0; j < NTS[k]; j++) fieldRow[code(k, j)] = F1 + TS[k] + j;
     for (let i = 0; i < NPO; i++) fieldRow['PO' + (i + 1)] = PO1 + i; fieldRow['TBD'] = TBDR;
-    const dsh = (NARB || NUDC) ? sheetOf('DESIGNAZIONI') : null;
+    const dsh = (NARB || NUDC) ? sheetOf('Designazioni') : null;
     const GNUM = {}; for (const c of CSH) { let n = c.goff; for (const { k, b } of c.blocks) for (let t = 0; t < RND[k][b].ng; t++) GNUM[k + ':' + (RSTART[k][b] + t)] = ++n; }
     const XNOTE = [], XPROV = [];
     const putX = (num, o) => { if (o.nota) XNOTE.push([num, o.nota]); if (o.prov) XPROV.push([num, o.prov]); };
@@ -903,7 +919,14 @@ async function generate(opt) {
           const pw = B.sh, [hdr, gr, vr] = B.PG[si][idx];
           { let f = 0; for (let a = 0; a < si; a++) f += B.PG[a].length; putX(B.first + f + idx, o); }
           if (si === 0 && o.a && /^[A-Z]{1,3}\d+$/.test(o.a) && o.b && /^[A-Z]{1,3}\d+$/.test(o.b)) { B.imp = true; setIf(pw, gr, 3, o.a); setIf(pw, gr, 5, o.b); }
-          if (si > 0 && o.ka && o.kb) {
+          if (B.custom) {   // schema del file di origine: squadre fisse o vincente/perdente di una gara precedente, lato per lato
+            const flat = []; B.SECT.forEach((s, a) => B.PG[a].forEach(g => flat.push(g[1])));
+            if (o.xa) { B.imp = true; setIf(pw, gr, 3, o.xa); }
+            if (o.xb) { B.imp = true; setIf(pw, gr, 5, o.xb); }
+            if (o.ka && flat[o.ka.ord] && flat[o.ka.ord] !== gr) { B.imp = true; pw.set(gr, 2, '=' + o.ka.col + flat[o.ka.ord]); pw.set(gr, 3, '=A' + flat[o.ka.ord]); }
+            if (o.kb && flat[o.kb.ord] && flat[o.kb.ord] !== gr) { B.imp = true; pw.set(gr, 4, '=' + o.kb.col + flat[o.kb.ord]); pw.set(gr, 5, '=A' + flat[o.kb.ord]); }
+          }
+          else if (si > 0 && o.ka && o.kb) {
             const flat = []; B.SECT.forEach((s, a) => B.PG[a].forEach(g => flat.push(g[1])));
             const ra = flat[o.ka.ord], rb = flat[o.kb.ord];
             if (ra && rb) { B.imp = true; pw.set(gr, 2, '=' + o.ka.col + ra); pw.set(gr, 3, '=A' + ra); pw.set(gr, 4, '=' + o.kb.col + rb); pw.set(gr, 5, '=A' + rb); }
@@ -918,7 +941,7 @@ async function generate(opt) {
         const N = o.t === 'arb' ? NARB : NUDC, sh = sheetOf(o.t === 'arb' ? 'Arbitri' : 'UdC'), i = (o.i | 0) - 1;
         if (!sh || i < 0 || i >= N) done = false; else { if (o.n) setIf(sh, 5 + i, 4, o.n); if (o.x) setIf(sh, 5 + i, 5, o.x); }
       }
-      else if (o.t === 'par' || o.t === 'fine') continue;
+      else if (o.t === 'par' || o.t === 'fine' || o.t === 'poschema') continue;
       else done = false;
       if (done) imp.ok++; else if (o.n || o.a || o.b || o.ra || o.rb || o.l || o.d) imp.skip++;
     }
@@ -941,8 +964,8 @@ async function generate(opt) {
     ['n', '2) Foglio Campionato, colonna C righe ' + T1 + '-' + T2 + ' (blocco SQUADRE, uno dopo l\'altro i gironi ' + LET.join(', ') + '): i nomi squadra nel formato \'Nome-Citta PR\'. La lettera in colonna E decide il girone.'],
     ['n', '3) Foglio Campionato, blocco CAMPI: righe ' + F1 + '-' + F2 + ' nome e link mappa del campo di ogni squadra; righe ' + PO1 + '-' + (PO1 + NPO - 1) + ' gli otto campi neutri PO1-PO8 per la fase a eliminazione diretta.'],
     ['n', '4) Fogli Calendario: per ogni gara i codici squadra (colonne C ed E), la data con orario (colonna F) e il codice campo (colonna I della riga sottostante).'],
-    ['n', (NARB || NUDC) ? '5) ' + [NARB ? 'foglio Arbitri (' + NARB + ' righe)' : '', NUDC ? 'foglio UdC (' + NUDC + ' righe)' : ''].filter(Boolean).join(' e ') + ', colonna D: i nominativi che alimentano gli elenchi a discesa delle designazioni.' : '5) Fogli Arbitri, UdC e DESIGNAZIONI non creati (numero di arbitri e di Ufficiali di Campo non indicato).'],
-    ...((NARB || NUDC) ? [['n', '6) Foglio DESIGNAZIONI: arbitri e Ufficiali di Campo, scelti dagli elenchi a discesa.']] : []),
+    ['n', (NARB || NUDC) ? '5) ' + [NARB ? 'foglio Arbitri (' + NARB + ' righe)' : '', NUDC ? 'foglio UdC (' + NUDC + ' righe)' : ''].filter(Boolean).join(' e ') + ', colonna D: i nominativi che alimentano gli elenchi a discesa delle designazioni.' : '5) Fogli Arbitri, UdC e Designazioni non creati (numero di arbitri e di Ufficiali di Campo non indicato).'],
+    ...((NARB || NUDC) ? [['n', '6) Foglio Designazioni: arbitri e Ufficiali di Campo, scelti dagli elenchi a discesa.']] : []),
     ['n', '* Durante la stagione si inseriscono solo i punteggi nelle colonne Risultato dei fogli Calendario' + (PO ? ' e Playoff' : '') + ': tutto il resto si aggiorna da solo.'],
     ['n', '* Calendario: ' + LET.map((L, k) => ORIG.includes(k) ? L + ' come nel file di origine (' + NRk[k] + ' giornate' + (RND[k].some(x => x.fase === 'Ritorno') ? ', andata e ritorno' : '') + ')' : L + ' girone all\'italiana ' + (AR ? 'di andata e ritorno, ' : 'di sola andata, ') + NRk[k] + ' giornate da ' + RND[k][0].ng + ' gare' + (NTS[k] % 2 ? ' (ogni giornata una squadra riposa)' : '')).join('; ') + '; ' + GTOT + ' gare in totale.'],
     ['n', PO ? '* Playoff a ' + PO + ' squadre: le prime ' + POQ + ' ' + (POG.length > 1 ? 'dei gironi ' + POG.join(', ') : 'del girone ' + POG[0]) + '; gare numerate dalla ' + (GTOT + 1) + ' alla ' + (GTOT + BR[0].ngames) + '.' : '* Nessun playoff.'],
@@ -964,9 +987,11 @@ async function generate(opt) {
   for (const nm of ['Arbitri', 'UdC']) { const sh = sheets.find(s => s.name === nm); if (!sh) continue; for (const R of sh.rows.values()) for (const x of R.cells.values()) if (x.k === 'f') x.v = x.v.replace(/([A-Z]{1,3}\$8:[A-Z]{1,3}\$)\d+(?!\d)/g, '$1' + DESLAST); }
 
   // ===== ordine e pacchetto =====
-  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'DESIGNAZIONI', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'RIEPILOGO', 'Note', 'Provvedimenti Disciplinari', 'Dati'];
-  // senza arbitri e Ufficiali di Campo il foglio DESIGNAZIONI non serve
-  const list = order.filter(nm => nm !== 'DESIGNAZIONI' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
+  // RIEPILOGO e' sempre l'ultimo foglio (ed e' l'unico col nome tutto maiuscolo)
+  const order = ['Campionato', ...CSH.map(c => c.name), ...BR.map(B => B.sheet), 'Classifica', 'Classifica Finale', 'Designazioni', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Note', 'Provvedimenti Disciplinari', 'Dati', 'RIEPILOGO'];
+  // senza arbitri e Ufficiali di Campo il foglio Designazioni non serve
+  const list = order.filter(nm => nm !== 'Designazioni' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
+  for (const sh of list) for (const Rw of sh.rows.values()) for (const x of Rw.cells.values()) if (x.k === 'f' && /DESIGNAZIONI/.test(x.v)) x.v = x.v.replace(/'?DESIGNAZIONI'?!/g, 'Designazioni!');
   log('Scrittura del file');
   const files = [];
   const ct = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'];
@@ -1264,16 +1289,20 @@ function extract(M) {
   }
   const vmap = c => { c = str(c); if (!c) return ''; return venueMap[c] || codeMap[c] || c; };
   // gare (blocchi "Gara N." + riga con "-" in colonna K)
-  function games(sh) {
-    const out = []; let bar = '', rk = '', fase = 'Andata';
+  const PO_RT = /(FINAL|QUART|OTTAV|SEDICES|TRENTADUES|SEMIFIN|PLAY.?OFF|PRIMAVERA)/i;
+  function games(sh, relax) {   // relax: fogli di playoff, gara riconosciuta anche senza il "-" in K
+    const out = []; let bar = '', rk = '', fase = 'Andata', rt = '', pof = false, lastG = -9;
     const rows = [...sh.cells.keys()].sort((a, b) => a - b);
     for (const r of rows) {
       const a = get(sh, r, 1);
       if (typeof a === 'string' && /RITORNO/i.test(a)) fase = 'Ritorno'; else if (typeof a === 'string' && /ANDATA/i.test(a)) fase = 'Andata';
       if (a !== undefined && str(a) !== '' && str(a) !== 'Gara N.' && str(get(sh, r + 1, 1)) === 'Gara N.') rk = str(a).toUpperCase();   // barra della giornata
       if (typeof a === 'string' && /^\d+[A-Z]{1,3}$/i.test(a.trim())) bar = a.trim().replace(/^\d+/, '').toUpperCase();
-      if (get(sh, r, 11) === '-' && str(get(sh, r - 1, 1)) === 'Gara N.') {
-        out.push({ row: r, num: get(sh, r, 1), a: get(sh, r, 3), b: get(sh, r, 5), d: typeof get(sh, r, 6) === 'number' ? get(sh, r, 6) : typeof get(sh, r, 7) === 'number' ? Math.floor(get(sh, r, 7)) + (typeof get(sh, r, 8) === 'number' ? get(sh, r, 8) % 1 : 0) : (str(get(sh, r, 7)) || undefined), c: get(sh, r + 1, 9), ra: get(sh, r, 10), rb: get(sh, r, 12), bar, rk, fase, vtxt: str(get(sh, r + 1, 2)), nameA: str(get(sh, r, 2)), nameB: str(get(sh, r, 4)), fa: sh.fx ? sh.fx.get(r * 1000 + 2) : undefined, fb: sh.fx ? sh.fx.get(r * 1000 + 4) : undefined });
+      { const bt = str(get(sh, r, 2));   // barra di sezione del playoff (QUARTI DI FINALE, FINALE 3°-4° POSTO...)
+        if (r !== lastG + 1 && str(a) !== 'Gara N.' && bt && PO_RT.test(bt) && (str(get(sh, r + 1, 1)) === 'Gara N.' || str(get(sh, r + 2, 1)) === 'Gara N.')) { rt = bt; pof = true; } }
+      if (str(get(sh, r - 1, 1)) === 'Gara N.' && (get(sh, r, 11) === '-' || (relax && (str(get(sh, r, 3)) || str(get(sh, r, 5)) || typeof get(sh, r, 10) === 'number' || typeof get(sh, r, 12) === 'number') && !PO_RT.test(str(get(sh, r, 2)))))) {
+        lastG = r;
+        out.push({ row: r, num: get(sh, r, 1), a: get(sh, r, 3), b: get(sh, r, 5), d: typeof get(sh, r, 6) === 'number' ? get(sh, r, 6) : typeof get(sh, r, 7) === 'number' ? Math.floor(get(sh, r, 7)) + (typeof get(sh, r, 8) === 'number' ? get(sh, r, 8) % 1 : 0) : (str(get(sh, r, 7)) || undefined), c: get(sh, r + 1, 9), ra: get(sh, r, 10), rb: get(sh, r, 12), bar, rk, fase, vtxt: str(get(sh, r + 1, 2)), nameA: str(get(sh, r, 2)), nameB: str(get(sh, r, 4)), fa: sh.fx ? sh.fx.get(r * 1000 + 2) : undefined, fb: sh.fx ? sh.fx.get(r * 1000 + 4) : undefined, rt, po: pof });
       }
     }
     return out;
@@ -1282,7 +1311,10 @@ function extract(M) {
   const poSheets = M.order.filter(n => /^Playoff/.test(n) || /^Coppa/.test(n) || /Primavera/.test(n));
   const cal = []; for (const n of calSheets) for (const g of games(S[n])) { g.sheet = n; cal.push(g); }
   const righe = [];
-  const minutes = d => typeof d === 'number' ? Math.round(d * 1440) : (d === undefined ? null : str(d));
+  // data scritta come testo gg/mm/aa(aa): convertita in data vera
+  const txtDate = d => { const m = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2}|\d{4})$/.exec(str(d)); if (!m) return null; const y = m[3].length === 2 ? 2000 + +m[3] : +m[3], mo = +m[2], dd = +m[1];
+    if (mo < 1 || mo > 12 || dd < 1 || dd > 31 || y < 1950 || y > 2100) return null; return (Date.UTC(y, mo - 1, dd) - Date.UTC(1899, 11, 30)) / 86400000; };
+  const minutes = d => typeof d === 'number' ? Math.round(d * 1440) : (d === undefined ? null : txtDate(d) != null ? Math.round(txtDate(d) * 1440) : str(d));
   const nGir = {}; letters.forEach(L => nGir[L] = 0);
   const uniS = {};   // fogli calendario con piu' gironi -> calendario unificato
   const calRef = [];   // per DESIGNAZIONI: posizione nel nuovo modello di ogni gara letta
@@ -1292,7 +1324,7 @@ function extract(M) {
   const numCodesPO = !teams.some(t => /^\d+$/.test(t.code));   // numeri al posto dei codici = gare di playoff solo se i codici squadra non sono numeri   // gare di playoff scritte nel foglio Calendario: non sono gare di girone
   for (const g of cal) {
     let L = null; const ta = teams.find(t => t.code === str(g.a)), tb = teams.find(t => t.code === str(g.b));
-    if (!ta && !tb && (isPoCode(g.a) || isPoCode(g.b) || (numCodesPO && /^\d+$/.test(str(g.a)) && /^\d+$/.test(str(g.b))))) { calPO.push(g); calRef.push(null); continue; }
+    if (g.po || (!ta && !tb && (isPoCode(g.a) || isPoCode(g.b) || (numCodesPO && /^\d+$/.test(str(g.a)) && /^\d+$/.test(str(g.b)))))) { g.ci = calRef.length; calPO.push(g); calRef.push(null); continue; }
     if (ta) L = ta.gir; else if (tb) L = tb.gir; else if (g.bar && letters.includes(g.bar)) L = g.bar;
     if (!L) { calRef.push(null); continue; }
     const k = letters.indexOf(L); const i = ++nGir[L];
@@ -1301,35 +1333,53 @@ function extract(M) {
     righe.push(o); calRef.push(o);
     (uniS[g.sheet] = uniS[g.sheet] || new Set()).add(NEWL[k]);
   }
-  // playoff: tabellone principale (primo foglio Playoff) e, se c'e', seconda griglia (Torneo/Coppa Primavera)
+  // playoff: tabellone principale e, se c'e', seconda griglia (Torneo/Coppa Primavera).
+  // Livelli: 1) tabellone del modello (squadre del primo turno per girone e posizione, anche scritte 3N, +37, -45, o col vecchio
+  // CERCA.VERT per posizione); 2) schema del file di origine con squadre e risultati; 3) solo la griglia vuota delle gare trovate;
+  // 4) nessuna gara trovata: tabellone standard secondo il numero di squadre
   let po = { squadre: 0, qualificate: 0, gironi: '' }, pp = { squadre: 0, qualificate: 0 };
-  const poAll = []; for (const n of poSheets) { const gs = games(S[n]); poAll.push({ n, gs, refs: gs.map(() => null) }); }
+  const poAll = []; for (const n of poSheets) { const gs = games(S[n], true); poAll.push({ n, gs, refs: gs.map(() => null) }); }
   const pfx = c => { const m = /^([A-Z]{1,3})(\d+)$/.exec(str(c)); return m && letters.includes(m[1]) ? m : null; };
   const tr = c => { const m = pfx(c); return m ? NEWL[letters.indexOf(m[1])] + m[2] : ''; };
-  const isCode = c => /^[A-Z]{1,3}\d+$/.test(str(c));
+  // girone e posizione: N3, 3N (al contrario) oppure, nel vecchio modello a girone singolo, CERCA.VERT(3;areaCercaDatiPerPosizioneSquadre...)
+  let useF = true;   // CERCA.VERT per posizione solo se il foglio e' stato davvero usato (altrimenti e' il modello vuoto)
+  const plab = (v, f) => { const s = str(v); let m;
+    if ((m = /^([A-Z]{1,3})(\d+)$/.exec(s)) && letters.includes(m[1])) return s;
+    if ((m = /^(\d+)([A-Z]{1,3})$/.exec(s)) && letters.includes(m[2])) return m[2] + m[1];
+    if (!s && useF && letters.length === 1 && (m = /VLOOKUP\(\s*(\d+)\s*,\s*areaCercaDatiPerPosizione/i.exec(String(f || '')))) return letters[0] + m[1];
+    if (/^\d+$/.test(s) && letters.length === 1 && /VLOOKUP\(\s*\$?C\$?\d+\s*,\s*areaCercaDatiPerPosizione|VLOOKUP\(\s*\$?E\$?\d+\s*,\s*areaCercaDatiPerPosizione/i.test(String(f || ''))) return letters[0] + s;   // posizione scritta in C/E
+    return null; };
+  const KIND = t => { const s = str(t).toUpperCase(), leg = /ANDATA/.test(s) ? 'Andata' : /RITORNO/.test(s) ? 'Ritorno' : '';
+    const n = /TRENTADUES/.test(s) ? 64 : /SEDICES/.test(s) ? 32 : /OTTAV/.test(s) ? 16 : /QUART/.test(s) ? 8 : /SEMIFIN/.test(s) ? 4 : 0;
+    const f = !n && /FINAL/.test(s) ? (/3\D{0,3}-\s*4|TERZO/.test(s) ? 34 : 12) : 0;
+    return { n, f, leg }; };
+  // le sezioni con titolo devono avere il numero di gare del tabellone del modello (es. QUARTI = 4 gare, niente andata/ritorno)
+  const okSections = part => { const by = new Map(); for (const g of part) by.set(g.rt, (by.get(g.rt) || 0) + 1);
+    for (const [t, c] of by) { const k = KIND(t); if (k.leg) return false; if (k.n && c !== k.n / 2) return false; } return true; };
   function takeBracket(P, from, type) {     // P = foglio, from = indice di partenza
-    const gs = P.gs; let k = from; while (k < gs.length && isCode(gs[k].a) && isCode(gs[k].b)) k++;
+    const gs = P.gs; let k = from; while (k < gs.length && plab(gs[k].a, gs[k].fa) && plab(gs[k].b, gs[k].fb)) k++;
     const size = 2 * (k - from);
     if (![2, 4, 8, 16, 32, 64].includes(size)) return null;
     const tot = size >= 4 ? size : 1;
     if (from + tot > gs.length) return null;
-    const codes = gs.slice(from, k).flatMap(g => [str(g.a), str(g.b)]);
-    const girs = [...new Set(codes.map(c => { const m = pfx(c); return m ? m[1] : ''; }))].filter(c => letters.includes(c)).sort((x, y) => letters.indexOf(x) - letters.indexOf(y));
-    const ranks = codes.map(c => +str(c).replace(/^[A-Z]+/, ''));
     const part = gs.slice(from, from + tot);
+    if (!okSections(part)) return null;
+    const codes = gs.slice(from, k).flatMap(g => [plab(g.a, g.fa), plab(g.b, g.fb)]);
+    const girs = [...new Set(codes.map(c => pfx(c)[1]))].sort((x, y) => letters.indexOf(x) - letters.indexOf(y));
+    const ranks = codes.map(c => +c.replace(/^[A-Z]+/, ''));
     const rowOrd = new Map(part.map((g, i) => [g.row, i]));
     const ref = f => { const m = /^=?\$?(AA|AB)\$?(\d+)$/.exec(String(f || '').trim()); return m && rowOrd.has(+m[2]) ? { col: m[1], ord: rowOrd.get(+m[2]) } : undefined; };
-    part.forEach((g, ord) => { const o = { t: type, ord, tot, a: tr(g.a), b: tr(g.b), ka: ref(g.fa), kb: ref(g.fb), d: minutes(g.d), c: vmap(g.c), ra: g.ra === undefined ? '' : g.ra, rb: g.rb === undefined ? '' : g.rb }; righe.push(o); P.refs[from + ord] = o; });
+    part.forEach((g, ord) => { const o = { t: type, ord, tot, a: tr(plab(g.a, g.fa)), b: tr(plab(g.b, g.fb)), ka: ref(g.fa), kb: ref(g.fb), d: minutes(g.d), c: vmap(g.c), ra: g.ra === undefined ? '' : g.ra, rb: g.rb === undefined ? '' : g.rb }; righe.push(o); P.refs[from + ord] = o; });
     return { size, girs, qmin: Math.min(...ranks), qmax: Math.max(...ranks), end: from + tot, sheet: P.n };
   }
   // tabellone con squadre esenti dal primo turno (es. 12 squadre: le prime due entrano ai quarti):
   // si ricostruisce il tabellone del modello con i BYE e si collega ogni gara di origine alla gara corrispondente
   function byeBracket(P, type) {
-    const gs = P.gs; let k1 = 0; while (k1 < gs.length && isCode(gs[k1].a) && isCode(gs[k1].b)) k1++;
+    const gs = P.gs; let k1 = 0; while (k1 < gs.length && plab(gs[k1].a, gs[k1].fa) && plab(gs[k1].b, gs[k1].fb)) k1++;
     if (!k1) return null;
-    const codes = gs.slice(0, k1).flatMap(g => [str(g.a), str(g.b)]);
-    const girs = [...new Set(codes.map(c => { const m = pfx(c); return m ? m[1] : ''; }))].filter(c => letters.includes(c)).sort((x, y) => letters.indexOf(x) - letters.indexOf(y));
-    const ranks = codes.map(c => +str(c).replace(/^[A-Z]+/, '')), qmin = Math.min(...ranks), qmax = Math.max(...ranks);
+    const codes = gs.slice(0, k1).flatMap(g => [plab(g.a, g.fa), plab(g.b, g.fb)]);
+    const girs = [...new Set(codes.map(c => pfx(c)[1]))].sort((x, y) => letters.indexOf(x) - letters.indexOf(y));
+    const ranks = codes.map(c => +c.replace(/^[A-Z]+/, '')), qmin = Math.min(...ranks), qmax = Math.max(...ranks);
     if (qmin <= 1 || !girs.length) return null;
     const N = qmax * girs.length; let P2 = 2; while (P2 < N) P2 *= 2;
     const seeds = []; for (let p = 1; p <= qmax; p++) for (const L of girs) seeds.push(L + p);
@@ -1340,37 +1390,108 @@ function extract(M) {
     while (prev.length > 2) { const cur = []; const m = prev.length; for (let i = 0; i < m / 2; i++) { const gi = ours.length; ours.push([win[prev[i]], win[prev[m - 1 - i]]]); win[gi] = 'W:' + gi; los[gi] = 'L:' + gi; cur.push(gi); } prev = cur; }
     if (prev.length === 2) { ours.push([los[prev[0]], los[prev[1]]]); ours.push([win[prev[0]], win[prev[1]]]); } else ours.push([win[prev[0]], 'BYE']);
     const byRow = new Map(), byNum = new Map(), recs = [];
-    const side = (code, f) => { const v = str(code); if (pfx(v)) return 'S:' + v; const m = /\b(AA|AB)\$?(\d+)\b/.exec(String(f || '')); let gi;
-      if (m && byRow.has(+m[2])) gi = byRow.get(+m[2]); else if (/^\d+$/.test(v) && byNum.has(+v)) gi = byNum.get(+v); if (gi === undefined) return null;
-      return (m && m[1] === 'AB' ? los : win)[gi]; };
-    let end = 0, miss = 0;
+    // lato di una gara: testa di serie, vincente/perdente di una gara precedente (=AA12 / =AB12, +37 / -37, 37)
+    const side = (code, f) => { const L = plab(code, f); if (L) return 'S:' + L; const v = str(code);
+      const m = /\b(AA|AB)\$?(\d+)\b/.exec(String(f || '')); let gi, lose = false;
+      if (m && byRow.has(+m[2])) { gi = byRow.get(+m[2]); lose = m[1] === 'AB'; }
+      else { const q = /^([+-]?)(\d+)$/.exec(v); if (q && byNum.has(+q[2])) { gi = byNum.get(+q[2]); lose = q[1] === '-'; } }
+      if (gi === undefined) return null;
+      return (lose ? los : win)[gi]; };
+    const filledG = g => typeof g.ra === 'number' || (str(g.a) && str(g.b));
+    let end = 0, miss = 0, lost = false;
     for (let x = 0; x < gs.length; x++) {
       const g = gs[x], A = side(g.a, g.fa), Bs = side(g.b, g.fb);
-      if (!A || !Bs) { if (x >= k1) { miss = gs.length - x; break; } continue; }
-      let gi = ours.findIndex(([p, q]) => (p === A && q === Bs) || (p === Bs && q === A));
-      if (gi < 0) { miss = gs.length - x; break; }
+      let gi = A && Bs ? ours.findIndex(([p, q]) => (p === A && q === Bs) || (p === Bs && q === A)) : -1;
+      if (gi < 0) { if (!A || !Bs) { if (x < k1) continue; } miss = gs.length - x; lost = gs.slice(x).some(filledG); break; }
       const sw = ours[gi][0] !== A;
       byRow.set(g.row, gi); if (typeof g.num === 'number') byNum.set(g.num, gi);
       const ra = g.ra === undefined ? '' : g.ra, rb = g.rb === undefined ? '' : g.rb;
       const o = { t: type, ord: gi, tot: ours.length, d: minutes(g.d), c: vmap(g.c), ra: sw ? rb : ra, rb: sw ? ra : rb }; recs.push(o); P.refs[x] = o; end = x + 1;
     }
+    if (!recs.length || lost) { P.refs.fill(null); return null; }   // schema diverso dal modello: si passa al livello successivo
     righe.push(...recs);
     return { size: N, girs, qmin: 1, qmax, end, sheet: P.n, bye: P2 - N, miss };
   }
-  const mainP = poAll.find(p => /^Playoff/.test(p.n) && p.gs.length);
+  // livelli 2 e 3: tabellone con lo schema del file di origine (sezioni e gare come nel file); squadre fisse
+  // (codice squadra, girone e posizione, oppure riconosciute dal nome) o vincente/perdente di una gara precedente
+  const tname = v => str(v).toLowerCase().replace(/[^a-z0-9àèéìòù]+/g, '');
+  const teamByName = new Map(); for (const t of teams) { const k = tname(t.name); if (k) teamByName.set(k, teamByName.has(k) ? null : t); }
+  const lev = (a, b) => { const d = Array.from({ length: b.length + 1 }, (_, j) => j); for (let i = 1; i <= a.length; i++) { let p = d[0]; d[0] = i; for (let j = 1; j <= b.length; j++) { const q = d[j]; d[j] = Math.min(d[j] + 1, d[j - 1] + 1, p + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; } } return d[b.length]; };
+  const findTeam = nm => { const k = tname(nm); if (!k || k.length < 4) return null; if (teamByName.has(k)) return teamByName.get(k);
+    let best = null, bd = 9, tie = false; for (const [n, t] of teamByName) { if (!t) continue; const x = lev(k, n); if (x < bd) { bd = x; best = t; tie = false; } else if (x === bd) tie = true; }
+    if (bd <= 2 && k.length >= 6 && !tie) return best;
+    const inc = [...teamByName].filter(([n, t]) => t && n.length >= 6 && k.length >= 6 && (n.includes(k) || k.includes(n)));   // nome abbreviato o allungato (es. "Glory Days" / "Glory Days Padova")
+    return inc.length === 1 ? inc[0][1] : null; };
+  function customBracket(P, type) {
+    const gs = P.gs; if (!gs.length) return null;
+    const secs = []; gs.forEach((g, x) => { let s = secs[secs.length - 1]; if (!s || s.t !== (g.rt || '')) { s = { t: g.rt || '', xs: [] }; secs.push(s); } s.xs.push(x); });
+    const K = secs.map(s => KIND(s.t));
+    const isLos = x => [gs[x].a, gs[x].b].some(v => /^-\d+$/.test(str(v))) || /\bAB\$?\d/.test(String(gs[x].fa || '') + String(gs[x].fb || ''));
+    let fin = null;
+    const i34 = secs.findIndex((s, i) => K[i].f === 34 && !K[i].leg && s.xs.length === 1), i12 = secs.findIndex((s, i) => K[i].f === 12 && !K[i].leg && s.xs.length === 1);
+    const i2 = secs.findIndex((s, i) => K[i].f === 12 && !K[i].leg && s.xs.length === 2);
+    if (i34 >= 0 && i12 >= 0) fin = [secs[i34].xs[0], secs[i12].xs[0]];
+    else if (i2 >= 0) { const [x0, x1] = secs[i2].xs; fin = isLos(x1) && !isLos(x0) ? [x1, x0] : [x0, x1]; }
+    else if (i12 >= 0) fin = [secs[i12].xs[0]];
+    const inFin = new Set(fin || []), place = new Map(), SECT = []; let ord = 0;
+    const nice = t => { const x = str(t).replace(/^PLAY.?OFF\s*-?\s*/i, '').trim() || 'Playoff'; return x.charAt(0).toUpperCase() + x.slice(1).toLowerCase(); };
+    secs.forEach((s, i) => { const xs = s.xs.filter(x => !inFin.has(x)); if (!xs.length) return;
+      SECT.push({ title: (s.t || 'PLAYOFF').toUpperCase(), ng: xs.length, n: K[i].n && !K[i].leg && xs.length === K[i].n / 2 ? K[i].n : 0, rname: nice(s.t) });
+      xs.forEach(x => place.set(x, ord++)); });
+    if (fin) { SECT.push({ title: fin.length > 1 ? 'FINALI' : 'FINALE', ng: fin.length, fin: true }); fin.forEach(x => place.set(x, ord++)); }
+    const tot = ord;
+    const rowX = new Map(gs.map((g, x) => [g.row, x])), numX = new Map(); gs.forEach((g, x) => { if (typeof g.num === 'number' && !numX.has(g.num)) numX.set(g.num, x); });
+    const side = (v, f, nm) => { const s = str(v); let m;
+      if ((m = /^([+-]?)(\d+)$/.exec(s)) && (m[1] || !codeMap[s]) && numX.has(+m[2])) return { k: { col: m[1] === '-' ? 'AB' : 'AA', ord: place.get(numX.get(+m[2])) } };
+      if ((m = /\b(AA|AB)\$?(\d+)\b/.exec(String(f || ''))) && rowX.has(+m[2])) return { k: { col: m[1], ord: place.get(rowX.get(+m[2])) } };
+      const t = findTeam(nm); if (t) return { x: codeMap[t.code] };   // squadra fissa riconosciuta dal nome
+      const L = plab(s, f); if (L) return { x: tr(L) };
+      if (codeMap[s]) return { x: codeMap[s] };
+      return null; };
+    const recs = [], seen = new Set(), unres = []; let nSide = 0, nRes = 0, lostRes = 0;
+    gs.forEach((g, x) => {
+      const o = { t: type, ord: place.get(x), tot, d: minutes(g.d), c: vmap(g.c) };
+      const A = side(g.a, g.fa, g.nameA), Bs = side(g.b, g.fb, g.nameB);
+      for (const [S0, kk, xx] of [[A, 'ka', 'xa'], [Bs, 'kb', 'xb']]) if (S0) { nSide++; if (S0.k) o[kk] = S0.k; else { o[xx] = S0.x; seen.add(S0.x); } }
+      if ((!A && g.nameA && !/^[(#-]/.test(g.nameA)) || (!Bs && g.nameB && !/^[(#-]/.test(g.nameB))) unres.push(str(g.num) + ' ' + (A ? '' : g.nameA || str(g.a)) + (A || Bs ? '' : ' - ') + (Bs ? '' : g.nameB || str(g.b)));
+      const hasRes = typeof g.ra === 'number' && typeof g.rb === 'number' && g.ra + g.rb > 0;
+      if (hasRes && A && Bs) { o.ra = g.ra; o.rb = g.rb; nRes++; } else if (hasRes) lostRes++;
+      recs.push(o); P.refs[x] = o;
+    });
+    const mode = nSide ? 'squadre' : 'vuota';
+    if (mode === 'vuota') recs.forEach(o => { delete o.d; delete o.c; });
+    const first = new Set(); let firstUn = 0; recs.forEach((o, x) => { if (place.get(x) >= SECT[0].ng) return; for (const k of ['xa', 'xb']) { if (o[k]) first.add(o[k]); else if (!o[k === 'xa' ? 'ka' : 'kb']) firstUn++; } });
+    const size = Math.min(64, Math.max(2, seen.size, first.size + firstUn));
+    righe.push({ t: 'poschema', w: type, P: size, mode, sect: SECT, tot }, ...recs);
+    return { size, girs: letters.slice(), qmin: 1, qmax: Math.ceil(size / letters.length), end: gs.length, sheet: P.n, custom: mode, ngames: tot, nRes, lostRes, unres, sect: SECT };
+  }
+  // livello 4: foglio di playoff senza gare riconoscibili -> tabellone standard (sedicesimi, ottavi, quarti o semifinali)
+  function stdBracket(n) { const m = /(\d+)\s*squadre/i.exec(n); let size = m ? +m[1] : 0;
+    if (!size) { const nt = teams.filter(t => !t.fc).length; size = 2; while (size * 2 <= Math.min(nt, 32)) size *= 2; }
+    size = Math.max(2, Math.min(64, size));
+    return { size, girs: letters.slice(), qmin: 1, qmax: Math.ceil(size / letters.length), end: 0, sheet: n, std: true }; }
+  // gare compilate a mano: risultato, data vera, codici in C/E o nomi scritti (non calcolati da formula)
+  const filled = P => P.gs.filter(g => typeof g.ra === 'number' || (typeof g.d === 'number' && g.d > 400) || str(g.a) || str(g.b) || (g.nameA && !g.fa && !/^[(#-]/.test(g.nameA))).length;
+  // foglio principale: tra i fogli Playoff quello piu' compilato; le gare di playoff scritte nel calendario solo se non ci sono fogli compilati
+  const cands = poAll.filter(p => !/Primavera|Coppa/i.test(p.n) && p.gs.length);
+  let mainP = cands.slice().sort((x, y) => filled(y) - filled(x))[0];
+  if ((!mainP || !filled(mainP)) && calPO.length) mainP = { n: calPO[0].sheet, gs: calPO, refs: calPO.map(() => null), cal: true };
   let B1 = null, B2 = null;
+  if (mainP && !filled(mainP)) { useF = false; mainP = poAll.find(p => /^Playoff/.test(p.n) && p.gs.length); }   // nessun foglio usato: solo il tabellone del modello, se c'e'
   if (mainP) {
     B1 = byeBracket(mainP, 'po') || takeBracket(mainP, 0, 'po');
-    if (B1) {
-      po = { squadre: B1.size, qualificate: B1.qmax, gironi: B1.girs.map(c => NEWL[letters.indexOf(c)]).join(',') };
-      if (B1.end < mainP.gs.length) B2 = takeBracket(mainP, B1.end, 'po2');
-      if (!B2) { const P2 = poAll.find(p => /Primavera|Coppa/i.test(p.n) && p.gs.length); if (P2) B2 = takeBracket(P2, 0, 'po2'); }
-      if (B2) pp = { squadre: B2.size, qualificate: B2.qmax - B2.qmin + 1 };
-    }
+    if (B1 && B1.end < mainP.gs.length) B2 = takeBracket(mainP, B1.end, 'po2');
+    if (!B1 && useF) B1 = customBracket(mainP, 'po');
+    if (mainP.cal) mainP.refs.forEach((o, x) => { if (o) calRef[calPO[x].ci] = o; });
+  } else { const e = poSheets.find(n => !/Primavera|Coppa/i.test(n) && S[n].maxRow > 10); if (e) B1 = stdBracket(e); }
+  if (B1) {
+    po = { squadre: B1.size, qualificate: B1.qmax, gironi: B1.girs.map(c => NEWL[letters.indexOf(c)]).join(',') };
+    if (!B2) { const P2 = poAll.find(p => /Primavera|Coppa/i.test(p.n)); if (P2) B2 = P2.gs.length ? (takeBracket(P2, 0, 'po2') || (filled(P2) ? customBracket(P2, 'po2') : null)) : S[P2.n].maxRow > 10 ? stdBracket(P2.n) : null; }
+    if (B2) pp = { squadre: B2.size, qualificate: B2.custom || B2.std ? Math.ceil(B2.size / letters.length) : B2.qmax - B2.qmin + 1 };
   }
   const poRef = []; poAll.forEach(p => p.refs.forEach(x => poRef.push(x)));
   // designazioni: per numero gara se disponibile, altrimenti per ordine
-  const des = S['DESIGNAZIONI'];
+  const des = S['DESIGNAZIONI'] || S['Designazioni'];
   let desN = 0, desSkip = 0;
   const byNum = new Map(); cal.forEach((g, i) => { if (typeof g.num === 'number' && calRef[i]) byNum.set(g.num, calRef[i]); });
   { let pi = 0; poAll.forEach(p => p.gs.forEach(g => { if (typeof g.num === 'number' && poRef[pi]) byNum.set(g.num, poRef[pi]); pi++; })); }
@@ -1423,16 +1544,17 @@ function extract(M) {
     if (badCode.length) warn.push(nG(badCode.length) + ' con codici squadra che non esistono nell\'elenco (es. gara ' + badCode.slice(0, 5).map(g => str(g.num) + ' ' + str(g.a) + '-' + str(g.b)).join('; ') + ').');
     const noTeam = cal.filter(g => !g.a && !g.b && typeof g.ra === 'number' && typeof g.rb === 'number' && g.ra + g.rb > 0 && !(g.nameA && g.nameB));
     if (noTeam.length) warn.push(nG(noTeam.length) + ' con il risultato ma senza squadre (es. gara ' + noTeam.slice(0, 5).map(g => str(g.num)).join(', ') + '): il risultato va perso.');
-    // playoff: scritture non riconosciute (3N, +37, -45, codici squadra, nomi)
-    for (const P of poAll) {
-      const odd = P.gs.filter(g => [g.a, g.b].some(x => { const v = str(x); return v && !/^[A-Z]{1,3}\d+$/.test(v) && !/^\d+$/.test(v); }) || [g.a, g.b].some(x => /^\d+[A-Z]{1,3}$/.test(str(x)) || /^[+-]\d+$/.test(str(x))));
-      const byN = P.gs.filter(g => (!g.a || !g.b) && g.nameA && g.nameB && !/^\(/.test(g.nameA));
-      const used = (B1 && B1.sheet === P.n) || (B2 && B2.sheet === P.n);
-      const hasData = P.gs.some(g => typeof g.ra === 'number' || (str(g.a) && str(g.b)));
-      if ((odd.length || byN.length || !used) && hasData) warn.push('foglio "' + P.n + '": tabellone ' + (used ? 'importato solo in parte' : 'non importato') + ' perche\' usa scritture non previste' + (odd.length ? ' (es. ' + odd.slice(0, 3).map(g => str(g.a) + ' - ' + str(g.b)).join('; ') + ')' : '') + (byN.length ? ' o squadre scritte per nome' : '') + '. Nel modello le squadre del primo turno si indicano con girone e posizione (es. N3) e i turni successivi si ricavano da soli; il playoff si puo\' anche ricreare dalla scheda Playoff.');
+    // playoff: livello d'importazione raggiunto
+    for (const [B, w] of [[B1, 'playoff'], [B2, 'Torneo Primavera']]) {
+      if (!B) continue;
+      if (B.custom === 'squadre') {
+        if (B.unres.length) warn.push('foglio "' + B.sheet + '": ' + nG(B.unres.length) + ' del ' + w + ' con squadre non riconosciute (es. gara ' + B.unres.slice(0, 4).join('; ') + '): nel nuovo file vanno scritte a mano (colonne C ed E: codice squadra, oppure girone e posizione come A3).');
+        if (B.lostRes) warn.push('foglio "' + B.sheet + '": ' + (B.lostRes === 1 ? '1 risultato' : B.lostRes + ' risultati') + ' del ' + w + (B.lostRes === 1 ? ' non importato' : ' non importati') + ' perche\' manca una delle due squadre.');
+      } else if (B.custom === 'vuota') warn.push('foglio "' + B.sheet + '": squadre del ' + w + ' non riconoscibili: creata solo la griglia vuota delle ' + B.ngames + ' gare trovate, da compilare a mano.');
     }
+    for (const P of poAll) { const used = [B1, B2].some(B => B && B.sheet === P.n); if (!used && filled(P)) warn.push('foglio "' + P.n + '": ' + nG(filled(P)) + ' non importate (il tabellone e\' stato preso dal foglio ' + (B1 ? B1.sheet : '-') + ').'); }
     // date scritte come testo (non riconoscibili come data)
-    const badD = cal.filter(g => (g.a || g.b) && typeof g.d === 'string' && g.d);
+    const badD = cal.filter(g => (g.a || g.b) && typeof g.d === 'string' && g.d && txtDate(g.d) == null);
     if (badD.length) warn.push(nG(badD.length) + ' con la data scritta come testo e non come data (es. gara ' + badD.slice(0, 5).map(g => str(g.num) + ' "' + g.d + '"').join('; ') + ').');
     // calendario senza gare compilate
     if (!cal.some(g => g.a || g.b || g.nameA || typeof g.ra === 'number')) warn.push('il calendario non contiene gare compilate: vengono importati solo squadre, campi e parametri.');
@@ -1440,7 +1562,7 @@ function extract(M) {
     const txtRes = cal.filter(g => [g.ra, g.rb].some(v => v !== undefined && v !== null && v !== '' && typeof v !== 'number'));
     if (txtRes.length) warn.push(nG(txtRes.length) + ' con il risultato scritto come testo (es. gara ' + txtRes.slice(0, 5).map(g => str(g.num) + ' "' + str(g.ra) + '-' + str(g.rb) + '"').join('; ') + '): il risultato non viene contato.');
     // fogli con gare che non sono calendari ne' tabelloni riconosciuti
-    const known = new Set([...calSheets, ...poSheets, 'Campionato', 'DESIGNAZIONI', 'Calendario.ics', 'RIEPILOGO', 'Dati', 'Classifica', 'Classifica Finale', 'Note', 'Provvedimenti Disciplinari', 'Arbitri', 'UdC', 'MEMO', 'REGOLAMENTO', 'ESEMPIO CALENDARIO']);
+    const known = new Set([...calSheets, ...poSheets, 'Campionato', 'DESIGNAZIONI', 'Designazioni', 'Calendario.ics', 'RIEPILOGO', 'Dati', 'Classifica', 'Classifica Finale', 'Note', 'Provvedimenti Disciplinari', 'Arbitri', 'UdC', 'MEMO', 'REGOLAMENTO', 'ESEMPIO CALENDARIO']);
     for (const n of M.order) if (!known.has(n) && S[n]) { const gs = games(S[n]).filter(g => g.a || g.b || g.nameA || typeof g.ra === 'number'); if (gs.length) warn.push('foglio "' + n + '": ' + nG(gs.length) + ' non importate (il nome del foglio non e\' un calendario ne\' un playoff riconosciuto).'); }
     // piu' fogli calendario sommati nello stesso girone (es. seconda fase nello stesso file)
     if (single && calSheets.filter(n => cal.some(g => g.sheet === n && (g.a || g.b))).length > 1) warn.push('piu\' fogli calendario (' + calSheets.join(', ') + ') sommati nello stesso girone: se uno e\' un\'altra fase, va separato in un file a parte.');
@@ -1451,18 +1573,19 @@ function extract(M) {
       if (comps.length > 1) warn.push('girone ' + L + ': le gare formano ' + comps.length + ' gruppi separati (' + comps.map(c => c.length).join(' + ') + ' squadre) che non si incontrano mai: probabilmente sono gironi diversi nello stesso file, con una sola classifica. Vanno separati (es. un file per girone, o la colonna girone).');
     }
     // designazioni senza anagrafiche
-    if (desN && !S['Arbitri'] && !S['UdC']) warn.push(desN + ' designazioni lette, ma il file non ha i fogli Arbitri e UdC: indicare il numero di arbitri e Ufficiali di Campo (o aggiungere i due fogli al file di origine), altrimenti il foglio DESIGNAZIONI non viene creato e le designazioni vanno perse.');
+    if (desN && !S['Arbitri'] && !S['UdC']) warn.push(desN + ' designazioni lette, ma il file non ha i fogli Arbitri e UdC: indicare il numero di arbitri e Ufficiali di Campo (o aggiungere i due fogli al file di origine), altrimenti il foglio Designazioni non viene creato e le designazioni vanno perse.');
   }
+  const LEV = B => B.custom === 'squadre' ? ' (schema del file di origine, ' + B.ngames + ' gare: importati squadre e risultati, ' + (B.nRes === 1 ? '1 risultato' : B.nRes + ' risultati') + '; i turni successivi non si ricavano da soli)' : B.custom === 'vuota' ? ' (schema del file di origine: solo griglia vuota di ' + B.ngames + ' gare)' : B.std ? ' (nessuna gara riconoscibile: tabellone standard)' : '';
   const report = [
     'Tipo riconosciuto: ' + tipo + '.',
     'Gironi: ' + letters.map((L, k) => L + ' -> ' + NEWL[k] + ' (' + byGir[L].length + ' squadre)').join(', ') + '.',
-    'Gare di girone lette: ' + righe.filter(o => o.t === 'gara').length + '; playoff: ' + (B1 ? 'tabellone a ' + B1.size + ' dal foglio ' + B1.sheet : 'nessuno') + (B2 ? '; Torneo Primavera: tabellone a ' + B2.size + ' dal foglio ' + B2.sheet : '') + (poSheets.filter(n => n !== (B1 && B1.sheet) && n !== (B2 && B2.sheet)).length ? ' (fogli ignorati: ' + poSheets.filter(n => n !== (B1 && B1.sheet) && n !== (B2 && B2.sheet)).join(', ') + ')' : '') + '.',
+    'Gare di girone lette: ' + righe.filter(o => o.t === 'gara').length + '; playoff: ' + (B1 ? 'tabellone a ' + B1.size + ' dal foglio ' + B1.sheet + LEV(B1) : 'nessuno') + (B2 ? '; Torneo Primavera: tabellone a ' + B2.size + ' dal foglio ' + B2.sheet + LEV(B2) : '') + (poSheets.filter(n => n !== (B1 && B1.sheet) && n !== (B2 && B2.sheet)).length ? ' (fogli ignorati: ' + poSheets.filter(n => n !== (B1 && B1.sheet) && n !== (B2 && B2.sheet)).join(', ') + ')' : '') + '.',
     'Designazioni lette: ' + desN + (desSkip ? ' (' + desSkip + ' senza gara corrispondente)' : '') + '; arbitri: ' + narb + '; ufficiali di campo: ' + nudc + '.'
   ];
   if (forfNote) report.push(forfNote);
   if (vNotes) report.push(vNotes + ' note scritte nella riga del campo (senza codice campo) portate nel foglio Note.');
   if (B1 && B1.bye) report.push('Playoff a ' + B1.size + ' squadre con ' + B1.bye + ' BYE: le teste di serie migliori passano il primo turno senza giocare; risultati del tabellone collegati alle gare del nuovo modello' + (B1.miss ? ' (' + B1.miss + ' gare non collegate, da reinserire)' : '') + '.');
-  if (calPO.length) report.push(nG(calPO.length) + ' di playoff scritte nel foglio del calendario: ignorate come gare di girone.');
+  if (calPO.length) report.push(nG(calPO.length) + ' di playoff scritte nel foglio del calendario: non contate come gare di girone' + (B1 && mainP && mainP.cal ? ', usate per il tabellone del playoff' : '') + '.');
   if (fcList.length) report.push('Squadre fuori classifica (risultati registrati ma non contati, come nel file di origine): ' + fcList.join(', ') + '.');
   for (const [key, lab] of [['nota', 'Note'], ['prov', 'Provvedimenti disciplinari']]) if (xn[key].sheet) report.push(lab + ' lette: ' + xn[key][0] + (xn[key][1] ? ' (' + xn[key][1] + ' senza gara corrispondente)' : '') + '.');
   if (extraFields.length) report.push('Campi non legati a una squadra spostati sui campi neutri: ' + extraFields.join(', ') + '.');
@@ -1532,7 +1655,7 @@ function remap(righe, map, tm, fm, all) {
   const out = [];
   for (const o of righe) {
     if (o.t === 'gara') { const g = map[o.g]; if (!g) continue; out.push(Object.assign({}, o, { g, a: team(o.a), b: team(o.b), c: venue(o.c) })); }
-    else if (o.t === 'po' || o.t === 'po2') { const a = remapCode(o.a, map, all), b = remapCode(o.b, map, all); out.push(Object.assign({}, o, { a: a || '', b: b || '', c: venue(o.c) })); }
+    else if (o.t === 'po' || o.t === 'po2') { const a = remapCode(o.a, map, all), b = remapCode(o.b, map, all), x = {}; if (o.xa) x.xa = team(o.xa); if (o.xb) x.xb = team(o.xb); out.push(Object.assign({}, o, { a: a || '', b: b || '', c: venue(o.c) }, x)); }
     else if (o.t === 'sq' || o.t === 'campo') { const k = remapCode(o.k, map, all); if (k) out.push(Object.assign({}, o, { k })); }
     else out.push(o);
   }

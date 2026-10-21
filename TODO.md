@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.15) sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.18) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 
@@ -26,14 +26,15 @@ Il generatore segnala questi casi in rosso sotto il riepilogo dell'importazione.
 - [ ] **TOSCANA**: 5 gare con le squadre scritte per nome; nella gara 3 i codici 7 e 8 non esistono nell'elenco di 6 squadre. Inserire i codici corretti.
 - [ ] **PIEMONTE-LIGURIA-VALLE D'AOSTA - Girone D**: gara PIE061 con la data scritta come testo ("16 Mar 0224", anno sbagliato). Scrivere una data vera.
 
-### Tabelloni di playoff non importati (scritture non previste)
+### Playoff importati solo in parte (Release 1.18)
 
-Il playoff si può anche ricreare dalla scheda Playoff del generatore; i risultati vanno poi reinseriti.
+Dalla Release 1.18 i tabelloni con schemi diversi dal modello si importano per livelli (tutto, solo squadre e risultati, griglia vuota, tabellone standard). Restano da completare a mano nel nuovo file:
 
-- [ ] **EMILIA-ROMAGNA 2023/2024**: codici scritti al contrario (`3N` invece di `N3`) e vincenti/perdenti indicati con `+37` / `-45`.
-- [ ] **LOMBARDIA EST 2023/2024 e 2025/2026 (Girone 1)**: tabellone con i codici squadra invece di girone e posizione.
-- [ ] **PUGLIA - Girone A & Playoff 2023/2024**: tabellone che mescola squadre dei gironi A e B (`B1`, `B2` e nomi scritti a mano) e un risultato "nd" scritto come testo.
-- [ ] Fogli "Playoff 4 Squadre" / "Playoff 8 Squadre" del vecchio modello a girone singolo compilati con codici squadra o nomi: Lombardia Nord Golden League, Lombardia Sud, Marche, Piemonte Rosso, Umbria (2025/2026); Lombardia Sud, Marche, Veneto Est (2024/2025); Lombardia Sud, Piemonte seconda fase (2023/2024).
+- [ ] **PIEMONTE/VALLE D'AOSTA - Girone ROSSO 2025/2026**: gara 95 con una squadra non presente nell'elenco (Concentrici Novara).
+- [ ] **VENETO Girone Est 2024/2025**: tabellone con squadre di altri gironi e dati incoerenti (la stessa squadra gioca tutte le gare): 2 gare da compilare a mano.
+- [ ] **FVG Girone A 2023/2024 e Girone 1 seconda fase**: semifinali con squadre di altri gironi, da compilare a mano.
+- [ ] **PUGLIA - Girone A & Playoff 2023/2024**: verificare le squadre del girone B riconosciute dal nome.
+- [ ] **Andata e ritorno nel playoff** (Lombardia Sud): importato con lo schema di origine; il passaggio del turno non si calcola da solo.
 
 ### File da non importare
 
@@ -62,6 +63,7 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 - [x] **3.9 Andata e ritorno per i campionati nuovi**: con l'importazione le giornate (compreso il ritorno) si copiano dal file di origine; per un campionato creato da zero il generatore fa solo il girone di sola andata. Fatto nella Release 1.15: casella "Andata e ritorno", non spuntata di default.
 - [ ] **3.10 Gare con una sola squadra**: oggi non contano per nessuno (Piemonte Rosso 2025/2026, Toscana 2023/2024). Da confermare.
 - [x] **3.11 Fuori classifica**: casella dedicata nel generatore (una squadra per riga), S in colonna FC del foglio Campionato, squadre in fondo alla classifica in ordine alfabetico, in giallo e con i valori a "-"; nel RIEPILOGO colonne Esiti Speciali e FC (A, B, AB). Fatto nella Release 1.17.
+- [x] **3.12 Import dei playoff con schemi particolari** (3N, +37/-45, codici squadra, nomi, andata e ritorno, gare nel calendario): fatto nella Release 1.18.
 
 ## 4. Altro
 
