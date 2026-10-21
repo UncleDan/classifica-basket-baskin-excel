@@ -42,7 +42,7 @@ Il playoff si può anche ricreare dalla scheda Playoff del generatore; i risulta
 
 ## 2. Da verificare
 
-Squadre riconosciute in automatico come **fuori classifica** (risultati in calendario ma 0 gare nella classifica di origine). Se una squadra non è davvero fuori classifica, togliere la X nella quinta colonna della casella Squadre.
+Squadre riconosciute in automatico come **fuori classifica** (risultati in calendario ma 0 gare nella classifica di origine). Se una squadra non è davvero fuori classifica, toglierla dalla casella **Fuori classifica** del generatore.
 
 - [ ] Lombardia Sud 2024/2025 e 2025/2026: Piacebaskin Lupa (corretto).
 - [ ] Toscana 2024/2025: Asd Costone Siena.
@@ -61,6 +61,7 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 - [ ] **3.8 Lombardia Nord 2026/2027**: tutte le tabelle del foglio Campionato sono spostate di una colonna a destra; oggi non si importa. In più il file ha calendari incompleti per i gironi da 12 squadre, numerazione delle gare sovrapposta, riferimenti a fogli cancellati e il playoff del modello a 10 gironi.
 - [x] **3.9 Andata e ritorno per i campionati nuovi**: con l'importazione le giornate (compreso il ritorno) si copiano dal file di origine; per un campionato creato da zero il generatore fa solo il girone di sola andata. Fatto nella Release 1.15: casella "Andata e ritorno", non spuntata di default.
 - [ ] **3.10 Gare con una sola squadra**: oggi non contano per nessuno (Piemonte Rosso 2025/2026, Toscana 2023/2024). Da confermare.
+- [x] **3.11 Fuori classifica**: casella dedicata nel generatore (una squadra per riga), S in colonna FC del foglio Campionato, squadre in fondo alla classifica in ordine alfabetico, in giallo e con i valori a "-"; nel RIEPILOGO colonne Esiti Speciali e FC (A, B, AB). Fatto nella Release 1.17.
 
 ## 4. Altro
 
