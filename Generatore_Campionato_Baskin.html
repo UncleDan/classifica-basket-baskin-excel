@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.20 - 2026-10-21 14-43-47 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.21 - 2026-10-22 15-51-52 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -721,6 +721,8 @@ async function generate(opt) {
         let f = v.replace(new RegExp('\\$([A-I])' + srcrow + '(?!\\d)', 'g'), (m, a) => '$' + a + n);
         f = f.replace(pat, (m, a, b) => "'" + sheet + "'!$" + a + (b === '10' ? gr : gr + 1));
         f = f.replace(/evt\d+@/, 'evt' + (n - 1) + '@');
+        // titolo dell'evento: numero di gara prima del girone o del turno, es. "A vs B [Gara 1, Girone O]"
+        if (c === 2) f = f.replace(/&" "&('[^']+'!)\$AC(\d+)\)$/, (m, X, rr) => '&" "&IF(' + X + '$AC' + rr + '="","[Gara "&' + X + '$A' + rr + '&"]","[Gara "&' + X + '$A' + rr + '&", "&MID(' + X + '$AC' + rr + ',2,LEN(' + X + '$AC' + rr + ')-1)))');
         x.k = 'f'; x.v = f;
       } else { x.k = k; x.v = v; }
     }
