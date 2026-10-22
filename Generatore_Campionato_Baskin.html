@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.21 - 2026-10-22 15-51-52 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.22 - 2026-10-22 18-14-13 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -721,8 +721,9 @@ async function generate(opt) {
         let f = v.replace(new RegExp('\\$([A-I])' + srcrow + '(?!\\d)', 'g'), (m, a) => '$' + a + n);
         f = f.replace(pat, (m, a, b) => "'" + sheet + "'!$" + a + (b === '10' ? gr : gr + 1));
         f = f.replace(/evt\d+@/, 'evt' + (n - 1) + '@');
-        // titolo dell'evento: numero di gara prima del girone o del turno, es. "A vs B [Gara 1, Girone O]"
-        if (c === 2) f = f.replace(/&" "&('[^']+'!)\$AC(\d+)\)$/, (m, X, rr) => '&" "&IF(' + X + '$AC' + rr + '="","[Gara "&' + X + '$A' + rr + '&"]","[Gara "&' + X + '$A' + rr + '&", "&MID(' + X + '$AC' + rr + ',2,LEN(' + X + '$AC' + rr + ')-1)))');
+        // titolo breve "G1: Squadra A vs Squadra B"; girone o turno di playoff nella descrizione, dopo il campionato
+        if (c === 2) f = f.replace(/^IF\(('[^']+'!)\$B(\d+)="","",.*\)$/, (m, X, rr) => 'IF(' + X + '$B' + rr + '="","","G"&' + X + '$A' + rr + '&": "&' + X + '$B' + rr + '&" vs "&' + X + '$D' + rr + ')');
+        if (c === 8) f = f.replace(/\)$/, '&IF(\'' + sheet + '\'!$AC' + gr + '="",""," "&\'' + sheet + '\'!$AC' + gr + '))');
         x.k = 'f'; x.v = f;
       } else { x.k = k; x.v = v; }
     }
