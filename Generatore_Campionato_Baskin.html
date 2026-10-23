@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.23 - 2026-10-23 11-06-07 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.24 - 2026-10-23 16-16-39 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -103,7 +103,7 @@ code{font:13px ui-monospace,Consolas,monospace}
 <label>Ufficiali di Campo<input id="nudc" type="number" autocomplete="off" min="0" max="2000" value=""></label>
 </div>
 <h2 style="margin-top:14px">Note e provvedimenti (facoltativi)</h2>
-<p class="hint">Fogli con il numero di gara e una casella larga per scrivere. Quello che si scrive compare nel RIEPILOGO accanto alla gara: prima le note tra parentesi, poi i provvedimenti disciplinari.</p>
+<p class="hint">Fogli con il numero di gara e una casella larga per scrivere. Quello che si scrive compare nel RIEPILOGO accanto alla gara, in due colonne separate: Note e Provvedimenti disciplinari. Il RIEPILOGO resta sempre l'ultimo foglio.</p>
 <label class="chk"><input id="note" type="checkbox" autocomplete="off"> Foglio Note</label>
 <label class="chk"><input id="prov" type="checkbox" autocomplete="off"> Foglio Provvedimenti Disciplinari</label>
 </section>
@@ -750,16 +750,16 @@ async function generate(opt) {
   }
   // testo per il RIEPILOGO: (note) seguite dai provvedimenti
   const xlook = (nm, r) => { const R = "'" + nm + "'!$"; return 'INDEX(' + R + 'B$2:$B$' + NXR + ',MATCH($A' + r + ',' + R + 'A$2:$A$' + NXR + ',0))'; };
-  const xnote = r => 'IFERROR(IF(' + xlook('Note', r) + '="","","("&' + xlook('Note', r) + '&")"),"")';
+  const xnote = r => 'IFERROR(' + xlook('Note', r) + '&"","")';
   const xprov = r => 'IFERROR(' + xlook('Provvedimenti Disciplinari', r) + '&"","")';
-  const xtext = r => NOTE && PROV ? '=' + xnote(r) + '&IF(AND(' + xnote(r) + '<>"",' + xprov(r) + '<>"")," ","")&' + xprov(r) : NOTE ? '=' + xnote(r) : '=' + xprov(r);
 
   // ===== RIEPILOGO: una gara per riga, solo formule =====
   log('RIEPILOGO');
   { const ew = mk('RIEPILOGO', 'Calendario.ics'); ew.tab = '757575';
     const HDR = ['Gara N.', 'Lettera Girone', 'Nome Girone', 'Giornata', 'Fase', 'Squadra A', 'Squadra B', 'Data', 'Ora', 'Campo', 'Punti Squadra A', 'Punti Squadra B', 'Esiti Speciali', 'FC'];
-    if (NOTE || PROV) HDR.push(NOTE && PROV ? 'Note e provvedimenti disciplinari' : NOTE ? 'Note' : 'Provvedimenti disciplinari');
-    const W = [8, 8, 18, 9, 26, 32, 32, 11, 7, 40, 9, 9, 18, 5, 60];
+    // note e provvedimenti disciplinari in due colonne separate (se i rispettivi fogli ci sono)
+    if (NOTE) HDR.push('Note'); if (PROV) HDR.push('Provvedimenti disciplinari');
+    const W = [8, 8, 18, 9, 26, 32, 32, 11, 7, 40, 9, 9, 18, 5, ...(NOTE ? [50] : []), ...(PROV ? [50] : [])];
     ew.cols = '<cols>' + W.map((w, i) => '<col width="' + w + '" customWidth="1" min="' + (i + 1) + '" max="' + (i + 1) + '"/>').join('') + '</cols>';
     HDR.forEach((h, i) => { const x = ew.cell(1, i + 1); x.s = 3; setv(x, h); });
     let r = 2;
@@ -777,7 +777,7 @@ async function generate(opt) {
       put(11, '=IF(' + X + '$J$' + gr + '="","",' + X + '$J$' + gr + ')'); put(12, '=IF(' + X + '$L$' + gr + '="","",' + X + '$L$' + gr + ')');
       put(13, '=IF(N(' + X + '$O$' + gr + ')>0,"Forfait Squadra A",IF(N(' + X + '$V$' + gr + ')>0,"Forfait Squadra B",""))');
       put(14, '=' + fcA(X, gr, 'C', 'B', 'A') + '&' + fcA(X, gr, 'E', 'D', 'B'));
-      if (NOTE || PROV) put(15, xtext(r));
+      if (NOTE) put(15, '=' + xnote(r)); if (PROV) put(NOTE ? 16 : 15, '=' + xprov(r));
     };
     // gare di girone: prima l'andata poi il ritorno, ognuna in ordine di girone e di giornata
     for (const fase of ['Andata', 'Ritorno']) for (let k = 0; k < G; k++) {
@@ -807,7 +807,7 @@ async function generate(opt) {
         r++;
       }));
     }
-    ew.printArea = 'A1:' + (NOTE || PROV ? 'O' : 'N') + (r - 1);
+    ew.printArea = 'A1:' + CL(14 + (NOTE ? 1 : 0) + (PROV ? 1 : 0)) + (r - 1);
   }
 
   // ===== DESIGNAZIONI =====
@@ -1054,7 +1054,7 @@ async function generate(opt) {
     ['n', '* Nomi dei gironi per la stampa: cella D11 del foglio Campionato (' + names.map((x, i) => x || LET[i]).join(', ') + ').'],
     ['n', '* Loghi: link pubblici alle immagini nelle celle D3 e D4 del foglio Campionato (funzione IMAGE: Google Sheets ed Excel 365).'],
     ['n', '* Colori dei gironi: ' + LET.map((L, i) => L + ' ' + cols[i]).join(', ') + '.'],
-    ...((NOTE || PROV) ? [['n', '* ' + [NOTE ? 'Foglio Note' : '', PROV ? 'foglio Provvedimenti Disciplinari' : ''].filter(Boolean).join(' e ') + ': numero di gara in colonna A e testo libero in colonna B (una riga per gara); il testo compare nel RIEPILOGO' + (NOTE && PROV ? ', prima le note tra parentesi e poi i provvedimenti.' : '.')]] : []),
+    ...((NOTE || PROV) ? [['n', '* ' + [NOTE ? 'Foglio Note' : '', PROV ? 'foglio Provvedimenti Disciplinari' : ''].filter(Boolean).join(' e ') + ': numero di gara in colonna A e testo libero in colonna B (una riga per gara); il testo compare nel RIEPILOGO' + (NOTE && PROV ? ', in due colonne separate (Note e Provvedimenti disciplinari).' : '.')]] : []),
     ['n', '* Foglio RIEPILOGO: una gara per riga (numero, girone, giornata, fase, squadre, data, ora, campo, punti, esiti speciali come i forfait, FC = squadra A, B o AB fuori classifica), ricavato con formule dai calendari' + (BR.length ? ' e dai tabelloni' : '') + '.'],
     ['n', '* Le formule usano solo intervalli di celle espliciti, senza nomi definiti.'],
     ...(opt.data && opt.data.origine ? [['n', '* Dati importati da: ' + opt.data.origine + '.']] : [])
