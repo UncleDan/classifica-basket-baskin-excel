@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.22 - 2026-10-22 18-14-13 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.23 - 2026-10-23 11-06-07 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -866,6 +866,11 @@ async function generate(opt) {
     const aw = mk(nm, nm);
     for (let r = 1; r <= 4; r++) copyRow(nm, r, aw, r);
     for (let i = 0; i < N; i++) copyRow(nm, i === 0 ? 5 : 6, aw, 5 + i, { refrow: 5 + i });
+    // colonna E: email (per usi futuri, es. invio delle designazioni); le note passano in F
+    { const h = aw.cell(4, 5); setv(h, 'Email'); const n = aw.cell(4, 6); n.s = h.s; setv(n, 'Indisponibilita\' / note');
+      for (let i = 0; i < N; i++) { aw.cell(5 + i, 6).s = aw.cell(5 + i, 5).s; }
+      aw.dv.push('<dataValidation type="custom" allowBlank="1" showErrorMessage="1" errorStyle="warning" errorTitle="Email" error="L\'indirizzo non sembra un\'email valida." sqref="E5:E' + (4 + N) + '"><formula1>ISNUMBER(FIND("@",E5))</formula1></dataValidation>');
+      aw.cols = '<cols>' + [3, 3, 20, 34, 34, 40, 3, 3, 3, 3, 3, 12, 12, 12, 12].map((w, i) => '<col width="' + w + '" customWidth="1" min="' + (i + 1) + '" max="' + (i + 1) + '"/>').join('') + '</cols>'; }
     for (const [c1, ra, c2, rb] of MER[nm]) if (rb < 5) aw.merge(CL(c1) + ra + ':' + CL(c2) + rb);
     aw.merge('C5:C' + (4 + N));
     for (const rule of S[nm].cf) aw.cf.push('<conditionalFormatting sqref="L5:O' + (4 + N) + '">' + rule + '</conditionalFormatting>');
@@ -1011,7 +1016,7 @@ async function generate(opt) {
       }
       else if (o.t === 'arb' || o.t === 'udc') {
         const N = o.t === 'arb' ? NARB : NUDC, sh = sheetOf(o.t === 'arb' ? 'Arbitri' : 'UdC'), i = (o.i | 0) - 1;
-        if (!sh || i < 0 || i >= N) done = false; else { if (o.n) setIf(sh, 5 + i, 4, o.n); if (o.x) setIf(sh, 5 + i, 5, o.x); }
+        if (!sh || i < 0 || i >= N) done = false; else { if (o.n) setIf(sh, 5 + i, 4, o.n); if (o.m) setIf(sh, 5 + i, 5, o.m); if (o.x) setIf(sh, 5 + i, 6, o.x); }
       }
       else if (o.t === 'par' || o.t === 'fine' || o.t === 'poschema') continue;
       else done = false;
@@ -1597,7 +1602,8 @@ function extract(M) {
   let narb = 0, nudc = 0;
   for (const [nm, tt] of [['Arbitri', 'arb'], ['UdC', 'udc']]) {
     const sh = S[nm]; if (!sh) continue; let i = 0;
-    for (let r = 5; r <= sh.maxRow; r++) { const n = str(get(sh, r, 4)); if (!n) continue; i++; righe.push({ t: tt, i, n, x: str(get(sh, r, 5)) }); }
+    const em = /mail/i.test(str(get(sh, 4, 5)));   // dalla Release 1.23: E = email, F = note
+    for (let r = 5; r <= sh.maxRow; r++) { const n = str(get(sh, r, 4)); if (!n) continue; i++; righe.push(em ? { t: tt, i, n, m: str(get(sh, r, 5)), x: str(get(sh, r, 6)) } : { t: tt, i, n, x: str(get(sh, r, 5)) }); }
     if (tt === 'arb') narb = i; else nudc = i;
   }
   const num = v => v === undefined || v === null || v === '' ? '' : String(v);
