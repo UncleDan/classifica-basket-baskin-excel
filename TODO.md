@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.24) sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.26) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 
@@ -52,7 +52,7 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 
 ## 3. Ancora da fare nel generatore
 
-- [ ] **3.1 Più gironi nello stesso file senza colonna girone**: Marche 2024/2025 (2 gironi da 4) e Piemonte seconda fase 2023/2024 (4 gironi da 4-3-3-3). Oggi diventano un girone unico con una sola classifica. Proposta: separarli in automatico in base a chi gioca contro chi, oppure far scegliere il girone di ogni squadra.
+- [x] **3.1 Più gironi nello stesso file senza colonna girone**: Marche 2024/2025 (2 gironi da 4), Marche 2025/2026 (2 gironi da 5) e Piemonte seconda fase 2023/2024 (gironi da 4-3-3-3). Fatto nella Release 1.26: i gruppi di squadre che non si incontrano mai diventano gironi separati con calendario unico; si può anche spostare a mano una squadra di girone dalla casella Squadre.
 - [ ] **3.2 Fasi**: seconda fase nello stesso file (foglio "Calendario SECONDA FASE" del Piemonte Rosso 2025/2026, oggi sommata al girone) o in file separati (FVG 2023/2024 e 2024/2025, Veneto 2023/2024). Serve il concetto di fase, che distingua prima e seconda fase in classifiche e riepilogo.
 - [ ] **3.3 Final Four tra più file** (Veneto Ovest 2024/2025): il foglio "Final Four" non viene riconosciuto, le squadre sono scritte a mano e vengono anche dal file Veneto Est. I dati di origine sono incoerenti: in finale 1°-2° c'è una squadra che ha perso la semifinale.
 - [ ] **3.4 Nome del girone**: oggi viene preso dalla cella del girone, spesso generica ("UNICO", "A", "DOPPIO", "ANDATA / RITORNO", "EST" nel Veneto seconda fase A). Proposta: ricavarlo dal nome del file (Gold Est, Girone B…).

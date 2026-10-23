@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.24 - 2026-10-23 16-16-39 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.26 - 2026-10-23 17-24-25 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -62,6 +62,7 @@ code{font:13px ui-monospace,Consolas,monospace}
 <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap"><button id="reload" type="button" class="sec" disabled>Rileggi</button><button id="reset" type="button" class="sec">Reset</button></div>
 <div id="rep" style="margin-top:8px;font-size:13px;white-space:pre-wrap"></div>
 <div id="warn" class="err" style="margin-top:6px;font-size:13px;white-space:pre-wrap"></div>
+<label class="chk" style="margin-top:8px"><input id="split" type="checkbox" autocomplete="off" checked> Dividi i gironi formati da gruppi di squadre che non si incontrano mai (es. due gironi da 5 nello stesso foglio): ogni gruppo diventa un girone, le gare seguono le loro squadre e il calendario resta unico (calendario unificato). Si applica con "Rileggi".</label>
 <label class="chk" style="margin-top:8px"><input id="orig" type="checkbox" autocomplete="off" checked> Mantieni le giornate del file di origine (numero di giornate, gare per giornata, andata e ritorno). Se si toglie, il calendario di ogni girone viene rigenerato come girone all'italiana (di sola andata, oppure di andata e ritorno con la casella nella scheda Gironi).</label>
 </section>
 <section class="card">
@@ -109,7 +110,7 @@ code{font:13px ui-monospace,Consolas,monospace}
 </section>
 <section class="card">
 <h2>Squadre (facoltativo)</h2>
-<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Il codice identifica la squadra (risultati e classifiche sono collegati al codice) e deve essere unico; il nome invece si può cambiare e può ripetersi in gironi diversi. Il codice può essere libero (es. REG, BO1): in quel caso conta il girone in quarta colonna e la squadra va nel primo posto libero di quel girone, mantenendo il codice scelto. Dopo un'importazione si possono cambiare nomi, penalizzazioni e codici: calendario e risultati seguono la squadra, e il suo campo di casa cambia codice con lei (anche negli scambi, es. A01 con A03).</p>
+<p class="hint">Una squadra per riga: <code>codice, nome, penalizzazione, girone</code>, come le colonne B-E del foglio Campionato. Se dopo un'importazione si cambia il girone di una squadra (quarta colonna), le sue gare la seguono nel calendario del nuovo girone: per dividere un girone basta aggiungere il nuovo girone nella scheda Gironi e spostarci le squadre (con "Calendari unificati" i due gironi possono restare in un unico foglio). Si incollano da Excel (tabulazioni) o da righe CSV separate da <code>,</code> o <code>;</code>. Il codice identifica la squadra (risultati e classifiche sono collegati al codice) e deve essere unico; il nome invece si può cambiare e può ripetersi in gironi diversi. Il codice può essere libero (es. REG, BO1): in quel caso conta il girone in quarta colonna e la squadra va nel primo posto libero di quel girone, mantenendo il codice scelto. Dopo un'importazione si possono cambiare nomi, penalizzazioni e codici: calendario e risultati seguono la squadra, e il suo campo di casa cambia codice con lei (anche negli scambi, es. A01 con A03).</p>
 <textarea autocomplete="off" id="teams" spellcheck="false" wrap="off" placeholder="A01&#9;Anaconde Audaci-Anacondeopoli AA&#9;&#9;A"></textarea>
 <h2 style="margin-top:14px">Fuori classifica (facoltativo)</h2>
 <p class="hint">Una squadra per riga, con il codice e/o il nome (es. <code>A03</code>, <code>Nome squadra</code> oppure <code>A03&#9;Nome squadra</code>). Le gare di una squadra fuori classifica restano nei calendari ma non contano per nessuna delle due squadre (né vittoria né sconfitta, né punti per i quozienti); in classifica la squadra è in fondo al girone, in ordine alfabetico, evidenziata in giallo e con tutti i valori a "-". Nel foglio Campionato corrisponde alla S in colonna F (FC). Con l'importazione la casella si riempie con le squadre fuori classifica trovate o dedotte dal file di origine: controllarla e correggerla se serve.</p>
@@ -228,7 +229,14 @@ function Styles(xml) {
     return s;
   }
   const YELLOW = +((/<dxfs count="(\d+)"/.exec(xml) || [0, 0])[1]);   // dxf giallo per le squadre fuori classifica
-  return { map, toXml, YELLOW };
+  // stile con allineamento verticale in alto (copia dello stile indicato)
+  const topCache = new Map();
+  function top(id, center) { const key = id + (center ? 'c' : ''); if (topCache.has(key)) return topCache.get(key); let x = xfs[id];
+    const al = 'vertical="top"' + (center ? ' horizontal="center"' : '');
+    x = /<alignment /.test(x) ? x.replace(/ ?vertical="[^"]*"/, '').replace(/ ?horizontal="[^"]*"/, '').replace('<alignment ', '<alignment ' + al + ' ') : x.replace(/\/>$/, ' applyAlignment="1"><alignment ' + al + '/></xf>');
+    if (!/applyAlignment="1"/.test(x)) x = x.replace('<xf ', '<xf applyAlignment="1" ');
+    xfs.push(x); topCache.set(key, xfs.length - 1); return xfs.length - 1; }
+  return { map, toXml, YELLOW, top };
 }
 
 // ---------------- foglio ----------------
@@ -743,8 +751,8 @@ async function generate(opt) {
     log(nm);
     const xw = mk(nm, 'Calendario.ics'); xw.tab = '757575'; XSH[nm] = xw;
     xw.cols = '<cols><col width="9" customWidth="1" min="1" max="1"/><col width="120" customWidth="1" min="2" max="2"/></cols>';
-    [['Gara N.', 1], [title, 2]].forEach(([h, c]) => { const x = xw.cell(1, c); x.s = 3; setv(x, h); });
-    for (let r = 2; r <= NXR; r++) { xw.cell(r, 1).s = 0; xw.cell(r, 2).s = 225; }
+    [['Gara N.', 1], [title, 2]].forEach(([h, c]) => { const x = xw.cell(1, c); x.s = c === 1 ? st.top(3, true) : 3; setv(x, h); });
+    for (let r = 2; r <= NXR; r++) { xw.cell(r, 1).s = st.top(0, true); xw.cell(r, 2).s = st.top(225); }   // allineamento in alto; Gara N. centrato
     xw.dv.push('<dataValidation type="whole" allowBlank="1" showErrorMessage="1" errorTitle="Gara N." error="Scrivere il numero della gara (da 1 a ' + NGAMES + ')." sqref="A2:A' + NXR + '"><formula1>1</formula1><formula2>' + NGAMES + '</formula2></dataValidation>');
     xw.printArea = 'A1:B' + NXR;
   }
@@ -1300,7 +1308,8 @@ async function read(buf) {
 }
 
 // ---------------- estrazione ----------------
-function extract(M) {
+function extract(M, opts) {
+  opts = opts || {};
   const S = M.sheets;
   const get = (sh, r, c) => { const R = sh.cells.get(r); return R ? R.get(c) : undefined; };
   const str = v => v === undefined || v === null ? '' : String(v).trim();
@@ -1682,6 +1691,49 @@ function extract(M) {
       const mem = []; for (const x of m[1].split(',')) { const r = /^([A-Z]{1,3})-([A-Z]{1,3})$/.exec(x.trim()); if (r && letters.includes(r[1]) && letters.includes(r[2])) { for (let i = letters.indexOf(r[1]); i <= letters.indexOf(r[2]); i++) mem.push(letters[i]); } else if (letters.includes(x.trim())) mem.push(x.trim()); }
       if (mem.length > 1) gs.push(mem.map(L => NEWL[letters.indexOf(L)]).join(',')); }
     if (M.order.some(n => /^Classifica (?!Finale)/.test(n))) ucl = gs.join('; '); }
+  // gironi che in realta' sono piu' gironi (gruppi di squadre che non si incontrano mai, es. Marche 2025/2026):
+  // si dividono in gironi separati, le gare seguono le loro squadre e il calendario resta unico (calendario unificato)
+  if (opts.split !== false) {
+    const usedS = new Set(gironi.map(g => g.sigla));
+    const nextS = () => { for (let c = 65; c <= 90; c++) { const s = String.fromCharCode(c); if (!usedS.has(s)) { usedS.add(s); return s; } } return null; };
+    const pre = c => String(c || '').replace(/\d+$/, '');
+    for (const g0 of gironi.slice()) {
+      const L = g0.sigla;
+      const sq = righe.filter(o => o.t === 'sq' && pre(o.k) === L).map(o => o.k);
+      const adj = new Map(sq.map(c => [c, new Set()]));
+      for (const o of righe) if (o.t === 'gara' && o.g === L && adj.has(o.a) && adj.has(o.b)) { adj.get(o.a).add(o.b); adj.get(o.b).add(o.a); }
+      const seen = new Set(), comps = [];
+      for (const c of sq) { if (seen.has(c) || !adj.get(c).size) continue; const st = [c], comp = []; seen.add(c); while (st.length) { const x = st.pop(); comp.push(x); for (const y of adj.get(x)) if (!seen.has(y)) { seen.add(y); st.push(y); } } comps.push(comp); }
+      if (comps.length < 2) continue;
+      for (const c of sq) if (!seen.has(c)) comps[0].push(c);   // squadre senza gare: nel primo gruppo
+      comps.forEach(comp => comp.sort((x, y) => sq.indexOf(x) - sq.indexOf(y)));
+      const sig = comps.map((_, i) => i === 0 ? L : nextS()); if (sig.some(s => !s)) continue;
+      const map = {}, gOf = {};
+      comps.forEach((comp, i) => comp.forEach((c, j) => { map[c] = sig[i] + String(j + 1).padStart(2, '0'); gOf[c] = sig[i]; }));
+      const mc = c => (c && map[c]) || c;
+      for (const o of righe) {
+        if (o.t === 'sq' || o.t === 'campo') { if (map[o.k]) o.k = map[o.k]; }
+        else if (o.t === 'gara' && o.g === L) { const g = gOf[o.a] || gOf[o.b]; o.a = mc(o.a); o.b = mc(o.b); o.c = mc(o.c); if (g) o.g = g; }
+        else if (o.t === 'gara') o.c = mc(o.c);
+        else if (/^po/.test(o.t)) { o.c = mc(o.c); if (o.xa) o.xa = mc(o.xa); if (o.xb) o.xb = mc(o.xb); }
+      }
+      // numerazione delle gare dentro ogni girone nell'ordine del file
+      for (const s of sig) { let i = 0; for (const o of righe) if (o.t === 'gara' && o.g === s) o.i = ++i; }
+      const gi = gironi.indexOf(g0), base = g0.name || L;
+      gironi.splice(gi, 1, ...comps.map((comp, i) => ({ name: base + ' ' + (i + 1), nt: Math.max(3, comp.length), color: i === 0 ? g0.color : '', sigla: sig[i] })));
+      const u = uni.findIndex(x => x.split(',').includes(L));
+      if (u >= 0) uni[u] = [...new Set([...uni[u].split(','), ...sig])].join(','); else uni.push(sig.join(','));
+      if (po.squadre && po.gironi && po.gironi.split(',').includes(L)) {
+        const pg = [...new Set([...po.gironi.split(','), ...sig])], minNT = Math.min(...comps.map(c => c.length));
+        if (B1 && B1.custom) po = Object.assign({}, po, { gironi: pg.join(',') });
+        else if (po.squadre % pg.length === 0 && po.squadre / pg.length <= minNT) po = Object.assign({}, po, { gironi: pg.join(','), qualificate: po.squadre / pg.length });
+        else warn.push('playoff: dopo la divisione del girone ' + L + ' controllare squadre, qualificate per girone e gironi del playoff.');
+      }
+      for (let w = warn.length - 1; w >= 0; w--) if (warn[w].startsWith('girone ' + letters[NEWL.indexOf(L)] + ': le gare formano')) warn.splice(w, 1);
+      report.push('Girone ' + L + ' diviso in ' + comps.map((c, i) => sig[i] + ' (' + c.length + ' squadre)').join(' e ') + ', perche\' le squadre dei gruppi non si incontrano mai; calendario unico ' + sig.join(',') + ' (si puo\' cambiare in "Calendari unificati").');
+    }
+    params[3] = gironi.map(g => g.sigla).join(','); params[9] = gironi.map(g => g.name).join(',');
+  }
   return { tipo, gironi, params, po, pp, narb, nudc, warn, ucl, note: !!xn.nota.sheet || vNotes > 0, prov: !!xn.prov.sheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
 }
 
@@ -1899,7 +1951,7 @@ async function importa() {
     const list = [], vuoti = [], errs = [];
     for (const f of FILES) {
       rep.textContent = 'Lettura di ' + f.name + '...';
-      try { const X = XL.extract(await XL.read(await f.arrayBuffer())); X.file = f.name; list.push(X); }
+      try { const X = XL.extract(await XL.read(await f.arrayBuffer()), { split: $('split').checked }); X.file = f.name; list.push(X); }
       catch (e) { if (e.code === 'VUOTO') { vuoti.push(f.name); continue; } errs.push(f.name + ': ' + e.message); }
     }
     if (errs.length) throw new Error(errs.length > 1 ? errs.length + ' file non importabili (da correggere prima di procedere):\n- ' + errs.join('\n- ') : errs[0]);
@@ -1942,7 +1994,7 @@ const dz = $('drop');
 dz.addEventListener('drop', ev => { if (ev.dataTransfer && ev.dataTransfer.files) addFiles(ev.dataTransfer.files); });
 ['dragover', 'drop'].forEach(t => window.addEventListener(t, ev => ev.preventDefault()));   // un file lasciato fuori dalla zona non apre una nuova pagina
 $('reload').addEventListener('click', () => importa());
-$('reset').addEventListener('click', () => { FILES = []; $('src').value = ''; clearImport(); setDefaults(); showFiles(); $('rep').textContent = ''; $('out').innerHTML = ''; preview(); });
+$('reset').addEventListener('click', () => { $('split').checked = true; FILES = []; $('src').value = ''; clearImport(); setDefaults(); showFiles(); $('rep').textContent = ''; $('out').innerHTML = ''; preview(); });
 
 // ---------- generazione ----------
 $('go').addEventListener('click', async () => {
@@ -1958,6 +2010,14 @@ $('go').addEventListener('click', async () => {
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
     let DATA = null, IR = [];
     if (IMPORTED) { const { tm, fm } = codeMaps(); IR = XL.remap(IMPORTED.righe, CURMAP, tm, fm, IMPORTED.origins); }   // gironi riordinati, rinominati o esclusi; codici cambiati
+    // squadre spostate in un altro girone (quarta colonna della casella Squadre): le loro gare le seguono
+    if (IR.length) { const gir = {}; for (const o of BX.recs) if (o.t === 'sq') gir[o.code || o.k] = o.g;
+      let moved = 0; const cross = [];
+      IR = IR.map(o => { if (o.t !== 'gara') return o; const ga = gir[o.a], gb = gir[o.b];
+        if (ga && gb && ga !== gb) { cross.push(o.a + '-' + o.b); return o; }
+        const g = ga || gb; if (g && g !== o.g) { moved++; return Object.assign({}, o, { g }); } return o; });
+      if (moved) { const n = {}; IR = IR.map(o => o.t === 'gara' ? Object.assign({}, o, { i: (n[o.g] = (n[o.g] || 0) + 1) }) : o); }
+      if (cross.length) say('Attenzione: ' + cross.length + (cross.length === 1 ? ' gara' : ' gare') + ' tra squadre di gironi diversi (es. ' + cross.slice(0, 4).join(', ') + '): restano nel calendario del girone di prima; controllare il girone delle due squadre.', 'err'); }
     if (IMPORTED || BX.recs.length) DATA = { origine: IMPORTED ? IMPORTED.origine : 'caselle Squadre e Campi', righe: [...IR, ...BX.recs] };
     const t0 = performance.now();
     const r = await GEN.generate({ blueprint: BLUEPRINT, gironi, params: GEN.parseParams($('cfg').value), cfg, data: DATA });
