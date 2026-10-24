@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.29 - 2026-10-24 10-24-46 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.30 - 2026-10-24 10-37-16 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -167,6 +167,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 28px}
 <textarea autocomplete="off" id="fields" spellcheck="false" wrap="off" placeholder="A01&#9;PalaAnaconde, Via dello Sport 1, Anacondeopoli AA&#9;https://..."></textarea>
 </section>
 <section class="card wide">
+<label class="chk" style="margin:0 0 10px"><input id="pos" type="checkbox" autocomplete="off"> Riferimenti fissi (file più leggero e veloce da ricalcolare, adatto ai campionati molto grandi). Di default il file usa le <b>ricerche per numero di gara</b>: nei calendari si possono spostare, copiare, aggiungere o cancellare gare a mano e classifiche, RIEPILOGO, Calendario.ics e Designazioni le trovano lo stesso. Con i riferimenti fissi invece le gare non vanno spostate né aggiunte a mano: le modifiche di struttura si fanno rigenerando il file.</label>
 <button id="go">Genera xlsx</button>
 <div id="out"></div>
 </section>
@@ -191,7 +192,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 28px}
 </ul>
 </div>
 </section>
-<p class="rev">Generatore Campionato Baskin · Release 1.29 del 2026-10-24 10-24-46 · © 2026 Daniele Lolli (UncleDan) feat. Claude AI · <a href="https://github.com/UncleDan/classifica-basket-baskin-excel" target="_blank" rel="noopener">GitHub</a> · licenza MIT (codice) e CC BY 4.0 (modelli)</p>
+<p class="rev">Generatore Campionato Baskin · Release 1.30 del 2026-10-24 10-37-16 · © 2026 Daniele Lolli (UncleDan) feat. Claude AI · <a href="https://github.com/UncleDan/classifica-basket-baskin-excel" target="_blank" rel="noopener">GitHub</a> · licenza MIT (codice) e CC BY 4.0 (modelli)</p>
 </footer>
 <div id="gofab"><button type="button" onclick="document.getElementById('go').click()">Genera xlsx</button></div>
 <script>
@@ -499,7 +500,28 @@ async function generate(opt) {
   const T1 = 14, T2 = T1 + TOTT - 1, F1 = T2 + 4, F2 = F1 + TOTT - 1, NPO = 8, PO1 = F2 + 1, TBDR = PO1 + NPO;
   let DESEND = 0; for (const c of CSH) { c.doff = DESEND; DESEND += c.last + 25; }
   const DOFF = NTS.map((_, k) => CSH[SHK[k]].doff);
-  const DATI_LAST = GTOT + 1;
+  // riferimenti: di default RICERCHE per numero di gara (il file regge le modifiche a mano: gare spostate, copiate,
+  // aggiunte o cancellate); con l'opzione "riferimenti fissi" (C.pos) i fogli di riepilogo puntano a celle fisse (piu' leggero)
+  const POS = !!C.pos && C.pos !== '0' && C.pos !== 'false', ROB = !POS;
+  const SP = ROB ? Math.min(100, Math.max(20, Math.ceil(GTOT * 0.1))) : 0;   // righe di scorta per le gare aggiunte a mano
+  const DATI_LAST = GTOT + 1 + SP;
+  const qS = n => "'" + String(n).replace(/'/g, "''") + "'!";
+  // riscrive i riferimenti alla riga di una gara (foglio S, righe gr e gr+1) come ricerca: H = cella con la riga trovata;
+  // multi = { si: cella con l'indice del foglio, sheets: [...] } per le righe di scorta (gara in uno qualsiasi dei fogli)
+  const rew = (f, S, gr, H, multi) => f.replace(/'((?:[^']|'')+)'!\$?([A-Z]{1,3})\$?(\d+)(?![\d(:])/g, (m, sh, col, row) => {
+    sh = sh.replace(/''/g, "'"); row = +row;
+    if (sh !== S || (row !== gr && row !== gr + 1)) return m;
+    const off = row > gr ? '+1' : '';
+    if (!multi) return 'INDEX(' + qS(S) + '$' + col + ':$' + col + ',' + H + off + ')';
+    return 'CHOOSE(' + multi.si + ',' + multi.sheets.map(n => 'INDEX(' + qS(n) + '$' + col + ':$' + col + ',' + H + off + ')').join(',') + ')';
+  });
+  const fMatch = (num, S) => 'IFERROR(MATCH(' + num + ',' + qS(S) + '$A:$A,0),"")';
+  const fSI = (num, shs) => shs.reduceRight((acc, n, i) => 'IFERROR(MATCH(' + num + ',' + qS(n) + '$A:$A,0)*0+' + (i + 1) + ',' + acc + ')', '""');
+  const fHm = (num, si, shs) => 'IF(' + si + '="","",CHOOSE(' + si + ',' + shs.map(n => 'MATCH(' + num + ',' + qS(n) + '$A:$A,0)').join(',') + '))';
+  const wrapIf = (f, H) => '=IF(' + H + '="","",' + f.replace(/^=/, '') + ')';
+  const hideCols = (ws, a, b) => { let x = ws.cols || ((ws.tpl && ws.tpl.pre.match(/<cols>[\s\S]*?<\/cols>/)) || ['<cols></cols>'])[0];
+    ws.cols = x.replace('</cols>', '<col hidden="1" width="10" customWidth="1" min="' + a + '" max="' + b + '"/></cols>'); };
+  const GNUM_ROW = {};   // foglio -> { riga gara: numero di gara }
   const TPL_POFF = 185;   // offset righe playoff in DESIGNAZIONI nel modello 1x10
   const st = Styles(BP.styles);
   const sty = (s, L) => L ? st.map(s, PAL[L]) : s;
@@ -631,7 +653,7 @@ async function generate(opt) {
     const cw = mk(c.name, 'Calendario A'); cw.tab = PAL[LET[c.mem[0]]][0];
     for (let r = 1; r <= 7; r++) copyRow('Calendario A', r, cw, r, { L: L0 });
     mergesRows('Calendario A', 1, 7, cw, 0);
-    const first = {};
+    const first = {}; let gnum = c.goff;
     c.blocks.forEach(({ k, b, base }, bi) => {
       const L = LET[k], NG = RND[k][b].ng, PITCH = pitch(k, b);
       let over = { 1: (b + 1) + L, 2: '="GIORNATA "&ROMAN(VALUE(LEFT(A' + base + ',LEN(A' + base + ')-' + L.length + ')))&" - GIRONE "&UPPER($O$3)' };
@@ -643,19 +665,26 @@ async function generate(opt) {
       if (uni) { const R = x => x.replace(/\bM3\b/g, 'M' + base).replace(/\bN3\b/g, 'N' + base); cw.set(base, 13, L); cw.set(base, 14, '=' + R(T3[14])); cw.set(base, 15, '=' + R(T3[15])); }
       for (let t = 0; t < NG; t++) {
         const hdr = base + 1 + 3 * t;
-        for (let q = 0; q < 3; q++) copyRow('Calendario A', 12 + q, cw, hdr + q, { L, over: (q === 1 && bi === 0 && t === 0) ? { 1: c.goff + 1 } : null });
+        for (let q = 0; q < 3; q++) copyRow('Calendario A', 12 + q, cw, hdr + q, { L, over: q === 1 && ROB ? { 1: ++gnum } : (q === 1 && bi === 0 && t === 0) ? { 1: c.goff + 1 } : null });
+        if (ROB) { const g = hdr + 1; (GNUM_ROW[c.name] = GNUM_ROW[c.name] || {})[g] = gnum;
+          // colonne nascoste della gara: giornata (dalla barra GIORNATA piu' vicina sopra), fase e girone del blocco
+          cw.set(g, 30, '=IFERROR(LOOKUP(2,1/ISNUMBER(SEARCH("GIORNATA",$B$8:$B' + (g - 1) + ')),$A$8:$A' + (g - 1) + '),"")');
+          cw.set(g, 31, RND[k][b].fase); cw.set(g, 32, L); }
         { const g = hdr + 1, FC = x => 'COUNTIFS(Campionato!$B$' + T1 + ':$B$' + T2 + ',' + x + ',Campionato!$F$' + T1 + ':$F$' + T2 + ',"S")>0', ex = 'OR(' + FC('$C' + g) + ',' + FC('$E' + g) + ')';
           cw.set(g, 13, '=IF(OR($B' + g + '="",$D' + g + '="",' + ex + '),"(Squadra A)",$C' + g + ')'); cw.set(g, 20, '=IF(OR($B' + g + '="",$D' + g + '="",' + ex + '),"(Squadra B)",$E' + g + ')'); }   // Dati per codice squadra; le gare con una squadra fuori classifica non contano
         mergesRows('Calendario A', 12, 14, cw, hdr - 12);
       }
       const sp = base + PITCH - 1; copyRow('Calendario A', 24, cw, sp, { L }); cw.merge('A' + sp + ':L' + sp);
     });
+    if (ROB) { hideCols(cw, 30, 32);   // numeri di gara ripetuti in rosso
+      cw.cf.push('<conditionalFormatting sqref="A9:A' + c.last + '"><cfRule type="expression" priority="2" dxfId="0" stopIfTrue="0"><formula>AND(ISNUMBER($A9),COUNTIF($A:$A,$A9)&gt;1)</formula></cfRule></conditionalFormatting>'); }
     if (!uni) cw.set(3, 13, '=RIGHT($A$8,' + L0.length + ')');
     if (uni) cw.set(3, 1, '="GIRONI "&' + c.mem.map(k => 'UPPER($O$' + first[k] + ')').join('&" - "&') + '&" - Stagione "&Campionato!$D$6');
     copyRow('Calendario A', 161, cw, c.last + 1, { L: L0 }); copyRow('Calendario A', 162, cw, c.last + 2, { L: L0 });
     cw.printArea = 'A1:L' + (c.last + 2);
   }
 
+  let B_DATI_SPARE = 0;
   // ===== DATI =====
   log('Dati');
   const dw = mk('Dati', 'Dati'); dw.hidden = true;
@@ -664,9 +693,12 @@ async function generate(opt) {
   { let n = 2; const tr = S['Dati'].rows[2].cells;
     for (const c of CSH) for (const { k, b } of c.blocks) for (let t = 0; t < RND[k][b].ng; t++) {
       const gr = grow(k, b, t);
-      for (let c = 0; c < 14; c++) { const x = dw.cell(n, c + 1); x.s = tr[c][1]; setv(x, "='" + calname(LET[k]) + "'!" + CL(13 + c) + gr); }
+      const SN = calname(LET[k]);
+      for (let c = 0; c < 14; c++) { const x = dw.cell(n, c + 1); x.s = tr[c][1]; const f = "='" + SN + "'!" + CL(13 + c) + gr; setv(x, ROB ? wrapIf(rew(f, SN, gr, '$S' + n), '$S' + n) : f); }
+      if (ROB) { dw.set(n, 17, GNUM_ROW[SN][gr]); dw.set(n, 19, '=' + fMatch('$Q' + n, SN)); }
       n++;
-    } }
+    }
+    B_DATI_SPARE = n; }
 
   // ===== PLAYOFF =====
   const RN = { 64: ['TRENTADUESIMI DI FINALE', 'Trentaduesimi'], 32: ['SEDICESIMI DI FINALE', 'Sedicesimi'], 16: ['OTTAVI DI FINALE', 'Ottavi'], 8: ['QUARTI DI FINALE', 'Quarti'], 4: ['SEMIFINALI', 'Semifinali'] };
@@ -679,7 +711,7 @@ async function generate(opt) {
     // schema importato da un file di origine con un tabellone diverso dal modello: sezioni e gare come nel file, squadre fisse
     const SCH = DATA_RIGHE ? DATA_RIGHE.find(o => o.t === 'poschema' && o.w === (sheet === 'Playoff' ? 'po' : 'po2') && +o.P === P && Array.isArray(o.sect) && o.sect.length) : null;
     const P2 = SCH ? (SCH.sect[SCH.sect.length - 1].fin && SCH.sect[SCH.sect.length - 1].ng === 2 ? 4 : 2) : (() => { let x = 2; while (x < P) x *= 2; return x; })();
-    const B = { sheet, P, P2, PG: [], PBAR: [], SECT: [], PNOTE: 0, imp: false, lab, bye: new Set(), custom: SCH ? SCH.mode || 'squadre' : '' };
+    const B = { sheet, P, P2, PG: [], PBAR: [], SECT: [], PNOTE: 0, imp: false, lab, bye: new Set(), custom: SCH ? SCH.mode || 'squadre' : '', pnum: first - 1 };
     const pw = B.sh = mk(sheet, 'Playoff');
     for (let r = 1; r <= 7; r++) copyRow('Playoff', r, pw, r);
     pw.set(3, 1, '="' + TOP + ' A ' + P + ' SQUADRE - Stagione "&Campionato!$D$6');
@@ -718,7 +750,8 @@ async function generate(opt) {
     const last = SECT.length - 1;
     const vl = c => '=IFERROR(VLOOKUP(' + c + ',Campionato!$G$' + T1 + ':$H$' + T2 + ',2,FALSE),"("&' + c + '&")")';
     const writeGame = (si, s, [hdr, gr, vr], over, bye, isFirst, leg, fin2i) => {
-      over[1] = isFirst ? first : '=MAX(A$10:A' + hdr + ')+1';
+      over[1] = ROB ? ++B.pnum : isFirst ? first : '=MAX(A$10:A' + hdr + ')+1';
+      if (ROB) (GNUM_ROW[sheet] = GNUM_ROW[sheet] || {})[gr] = B.pnum;
       const lg = leg ? ' ' + leg : '';
       over[29] = SCH ? '=IF($B' + gr + '="","","[' + lab + ' - ' + (s.fin ? (s.ng === 2 && fin2i === 0 ? 'Finale 3-4' : 'Finale 1-2') : String(s.lab).replace(/"/g, '')) + ']")'
         : !s.fin ? '=IF($B' + gr + '="","","[' + lab + ' - ' + s.lab + lg + ']")'
@@ -772,6 +805,7 @@ async function generate(opt) {
     notes.forEach((t, i) => copyRow('Playoff', 39 + Math.min(i, 3), pw, cur + 1 + i, { over: { 1: t } }));
     B.PNOTE = cur + 1;
     pw.printArea = 'A1:L' + (cur + notes.length);
+    if (ROB) pw.cf.push('<conditionalFormatting sqref="A9:A' + cur + '"><cfRule type="expression" priority="2" dxfId="0" stopIfTrue="0"><formula>AND(ISNUMBER($A9),COUNTIF($A:$A,$A9)&gt;1)</formula></cfRule></conditionalFormatting>');
     B.ngames = PG.reduce((a, l) => a + l.length, 0);
     B.first = first;
     BR.push(B);
@@ -781,11 +815,19 @@ async function generate(opt) {
   if (PP) bracket('Torneo Primavera', PP, POQ, PPQ, GTOT + BR[0].ngames + 1, 'Torneo Primavera', 'TORNEO PRIMAVERA');
   const PG = PO ? BR[0].PG : [];
 
+  // ===== RIGHE DI SCORTA (ricerche): gare aggiunte a mano nei calendari con numero da SPN+1 a SPN+SP =====
+  const SPN = GTOT + BR.reduce((a, B) => a + B.ngames, 0), CALS = CSH.map(c => c.name), DUMMY = 1048000;
+  if (ROB) { const tr = S['Dati'].rows[2].cells; let n = B_DATI_SPARE;
+    for (let i = 1; i <= SP; i++, n++) {
+      dw.set(n, 17, SPN + i); dw.set(n, 18, '=' + fSI('$Q' + n, CALS)); dw.set(n, 19, '=' + fHm('$Q' + n, '$R' + n, CALS));
+      for (let c = 0; c < 14; c++) { const x = dw.cell(n, c + 1); x.s = tr[c][1]; setv(x, wrapIf(rew("='" + CALS[0] + "'!" + CL(13 + c) + DUMMY, CALS[0], DUMMY, '$S' + n, { si: '$R' + n, sheets: CALS }), '$S' + n)); }
+    }
+    hideCols(dw, 17, 19); }
   // ===== ICS =====
   log('Calendario.ics');
   const iw = mk('Calendario.ics', 'Calendario.ics');
   copyRow('Calendario.ics', 1, iw, 1);
-  function icsrow(n, srcrow, sheetFrom, sheet, gr) {
+  function icsrow(n, srcrow, sheetFrom, sheet, gr, spare) {
     const pat = new RegExp("'" + sheetFrom + "'!\\$([A-Z]+)(10|11)(?!\\d)", 'g');
     for (const [c, s, k, v] of S['Calendario.ics'].rows[srcrow].cells) {
       const x = iw.cell(n, c); x.s = s;
@@ -796,13 +838,17 @@ async function generate(opt) {
         // titolo breve "G1: Squadra A vs Squadra B"; girone o turno di playoff nella descrizione, dopo il campionato
         if (c === 2) f = f.replace(/^IF\(('[^']+'!)\$B(\d+)="","",.*\)$/, (m, X, rr) => 'IF(' + X + '$B' + rr + '="","","G"&' + X + '$A' + rr + '&": "&' + X + '$B' + rr + '&" vs "&' + X + '$D' + rr + ')');
         if (c === 8) f = f.replace(/\)$/, '&IF(\'' + sheet + '\'!$AC' + gr + '="",""," "&\'' + sheet + '\'!$AC' + gr + '))');
+        if (ROB && c >= 2 && c <= 8) f = 'IF($L' + n + '="","",' + rew(f, sheet, gr, '$L' + n, spare ? { si: '$K' + n, sheets: CALS } : null) + ')';   // ricerca per numero di gara
         x.k = 'f'; x.v = f;
       } else { x.k = k; x.v = v; }
     }
+    if (ROB) { if (spare) { iw.set(n, 10, spare); iw.set(n, 11, '=' + fSI('$J' + n, CALS)); iw.set(n, 12, '=' + fHm('$J' + n, '$K' + n, CALS)); }
+      else { iw.set(n, 10, GNUM_ROW[sheet][gr]); iw.set(n, 12, '=' + fMatch('$J' + n, sheet)); } }
   }
   let n = 2;
   for (const c of CSH) for (const { k, b } of c.blocks) for (let t = 0; t < RND[k][b].ng; t++) icsrow(n++, 2, 'Calendario A', c.name, grow(k, b, t));
   for (const B of BR) for (const lst of B.PG) for (const [hdr, gr] of lst) if (!B.bye.has(gr)) icsrow(n++, 47, 'Playoff', B.sheet, gr);
+  if (ROB) { for (let i = 1; i <= SP; i++) icsrow(n++, 2, 'Calendario A', CALS[0], DUMMY, SPN + i); hideCols(iw, 10, 12); }
   copyRow('Calendario.ics', 56, iw, n + 1);
   iw.printArea = 'A1:I1';
 
@@ -840,6 +886,21 @@ async function generate(opt) {
     const fcA = (X, gr, cc, nc, lt) => BR.some(B => X === "'" + B.sheet + "'!")
       ? 'IF(RIGHT(' + X + '$' + nc + '$' + gr + ',6)="(f.c.)","' + lt + '","")'
       : 'IF(COUNTIFS(Campionato!$B$' + T1 + ':$B$' + T2 + ',' + X + '$' + cc + '$' + gr + ',Campionato!$F$' + T1 + ':$F$' + T2 + ',"S")>0,"' + lt + '","")';
+    // ricerche: girone (dal codice della squadra A, altrimenti dal blocco), giornata (barra sopra la gara) e fase dalle colonne nascoste della gara
+    const girCols = (X, gr) => {
+      put(2, '=IFERROR(INDEX(Campionato!$E$' + T1 + ':$E$' + T2 + ',MATCH(' + X + '$C$' + gr + ',Campionato!$B$' + T1 + ':$B$' + T2 + ',0)),' + X + '$AF$' + gr + ')');
+      put(3, '=' + T3[15].replace(/\bN3\b/g, '(' + T3[14].replace(/\bM3\b/g, '$B' + r) + ')').replace(/\bM3\b/g, '$B' + r));
+      const D = X + '$AD$' + gr;
+      put(4, '=IFERROR(VALUE(LEFT(' + D + ',3)),IFERROR(VALUE(LEFT(' + D + ',2)),IFERROR(VALUE(LEFT(' + D + ',1)),"")))');
+      put(5, '=' + X + '$AE$' + gr);
+    };
+    // riga cercata per numero di gara: AD = numero, AE = foglio (righe di scorta), AF = riga trovata
+    const robRow = (SN, gr, spare) => {
+      const H = '$AF' + r, multi = spare ? { si: '$AE' + r, sheets: CALS } : null;
+      for (let c = 1; c <= 14; c++) { const x = ew.cell(r, c); if (x.k === 'f') x.v = wrapIf(rew(x.v, SN, gr, H, multi), H).replace(/^=/, ''); }
+      if (spare) { ew.set(r, 30, spare); ew.set(r, 31, '=' + fSI('$AD' + r, CALS)); ew.set(r, 32, '=' + fHm('$AD' + r, '$AE' + r, CALS)); }
+      else { ew.set(r, 30, GNUM_ROW[SN][gr]); ew.set(r, 32, '=' + fMatch('$AD' + r, SN)); }
+    };
     const common = (X, gr) => {
       put(1, '=' + X + '$A$' + gr);
       put(6, '=' + X + '$B$' + gr); put(7, '=' + X + '$D$' + gr);
@@ -860,10 +921,13 @@ async function generate(opt) {
         for (let t = 0; t < RND[k][b].ng; t++) {
           const gr = grow(k, b, t);
           common(X, gr);
-          put(2, '=RIGHT(' + X + '$A$' + bar + ',' + LET[k].length + ')');
-          put(3, '=' + T3[15].replace(/\bN3\b/g, '(' + T3[14].replace(/\bM3\b/g, '$B' + r) + ')').replace(/\bM3\b/g, '$B' + r));
-          put(4, '=VALUE(LEFT(' + X + '$A$' + bar + ',LEN(' + X + '$A$' + bar + ')-' + LET[k].length + '))');
-          put(5, RND[k][b].fase);
+          if (ROB) { girCols(X, gr); robRow(CSH[SHK[k]].name, gr); }
+          else {
+            put(2, '=RIGHT(' + X + '$A$' + bar + ',' + LET[k].length + ')');
+            put(3, '=' + T3[15].replace(/\bN3\b/g, '(' + T3[14].replace(/\bM3\b/g, '$B' + r) + ')').replace(/\bM3\b/g, '$B' + r));
+            put(4, '=VALUE(LEFT(' + X + '$A$' + bar + ',LEN(' + X + '$A$' + bar + ')-' + LET[k].length + '))');
+            put(5, RND[k][b].fase);
+          }
           r++;
         }
       }
@@ -876,9 +940,13 @@ async function generate(opt) {
         common(X, gr);
         const leg = B.LEG && B.LEG[si] && B.LEG[si][i] ? ' - ' + B.LEG[si][i] : '';
         put(5, pre + (!sct.fin ? (sct.rname || RNAME[sct.n]) + leg : sct.ng === 1 ? 'Finale' : i === 0 ? 'Finale 3°-4° posto' : 'Finale 1°-2° posto'));
+        if (ROB) robRow(B.sheet, gr);
         r++;
       }));
     }
+    // righe di scorta: gare aggiunte a mano nei calendari (numero di gara dopo l'ultimo)
+    if (ROB) { for (let i = 1; i <= SP; i++) { const X = qS(CALS[0]); common(X, DUMMY); girCols(X, DUMMY); robRow(CALS[0], DUMMY, SPN + i); r++; }
+      hideCols(ew, 30, 32); }
     ew.printArea = 'A1:' + CL(14 + (NOTE ? 1 : 0) + (PROV ? 1 : 0)) + (r - 1);
   }
 
@@ -888,6 +956,13 @@ async function generate(opt) {
   for (let r = 1; r <= 7; r++) copyRow('DESIGNAZIONI', r, dsw, r);
   mergesRows('DESIGNAZIONI', 1, 7, dsw, 0);
   const DESGAME = [];
+  // ricerche: riga della gara (e riga del campo sotto) cercata per numero di gara; T = numero, U = foglio (scorta), V = riga trovata
+  function robDes(r, SN, gr, spare) {
+    const H = '$V' + r, multi = spare ? { si: '$U' + r, sheets: CALS } : null;
+    for (const rr of [r, r + 1]) for (let c = 1; c <= 12; c++) { const x = dsw.cell(rr, c); if (x.k === 'f') x.v = wrapIf(rew(x.v, SN, gr, H, multi), H).replace(/^=/, ''); }
+    if (spare) { dsw.set(r, 20, spare); dsw.set(r, 21, '=' + fSI('$T' + r, CALS)); dsw.set(r, 22, '=' + fHm('$T' + r, '$U' + r, CALS)); }
+    else { dsw.set(r, 20, GNUM_ROW[SN][gr]); dsw.set(r, 22, '=' + fMatch('$T' + r, SN)); }
+  }
   for (const c of CSH) {
     const off = c.doff, sub = ["'Calendario A'", "'" + c.name + "'"];
     for (const { k, b, base } of c.blocks) {
@@ -898,6 +973,7 @@ async function generate(opt) {
         for (let q = 0; q < 3; q++) copyRow('DESIGNAZIONI', 12 + q, dsw, hdr + q + off, { L, refrow: hdr + q, sub });
         mergesRows('DESIGNAZIONI', 12, 14, dsw, hdr + off - 12);
         DESGAME.push(hdr + 1 + off);
+        if (ROB) robDes(hdr + 1 + off, c.name, hdr + 1);
       }
     }
   }
@@ -911,11 +987,19 @@ async function generate(opt) {
           for (let q = 0; q < 3; q++) copyRow('DESIGNAZIONI', 197 + q, dsw, hdr + q + poff, { refrow: hdr + q + TPL_POFF, sub });
           mergesRows('DESIGNAZIONI', 197, 199, dsw, hdr + poff - 197);
           DESGAME.push(gr + poff);
+          if (ROB) robDes(gr + poff, B.sheet, gr);
         }
       });
       lastrow = B.PG[B.PG.length - 1][B.PG[B.PG.length - 1].length - 1][2] + poff;
       poff = lastrow + 12 - 8;
     } }
+  // righe di scorta per le gare aggiunte a mano nei calendari
+  if (ROB) { const bar = lastrow + 2, sub = ["'Calendario A'", qS(CALS[0]).slice(0, -1)];
+    copyRow('DESIGNAZIONI', 8, dsw, bar, { L: LET[0], over: { 1: '', 2: 'GARE AGGIUNTE A MANO NEI CALENDARI (numeri di gara da ' + (SPN + 1) + ' a ' + (SPN + SP) + ')' } }); mergesRows('DESIGNAZIONI', 8, 8, dsw, bar - 8);
+    for (let i = 1; i <= SP; i++) { const hdr = bar + 1 + 3 * (i - 1);
+      for (let q = 0; q < 3; q++) copyRow('DESIGNAZIONI', 12 + q, dsw, hdr + q, { L: LET[0], refrow: DUMMY - 1 + q, sub });
+      mergesRows('DESIGNAZIONI', 12, 14, dsw, hdr - 12); DESGAME.push(hdr + 1); robDes(hdr + 1, CALS[0], DUMMY, SPN + i); }
+    lastrow = bar + 3 * SP; hideCols(dsw, 20, 22); }
   const DES_NOTE = lastrow + 3;
   copyRow('DESIGNAZIONI', 224, dsw, DES_NOTE);
   copyRow('DESIGNAZIONI', 225, dsw, DES_NOTE + 1);
@@ -1129,6 +1213,9 @@ async function generate(opt) {
     ...((NOTE || PROV) ? [['n', '* ' + [NOTE ? 'Foglio Note' : '', PROV ? 'foglio Provvedimenti Disciplinari' : ''].filter(Boolean).join(' e ') + ': numero di gara in colonna A e testo libero in colonna B (una riga per gara); il testo compare nel RIEPILOGO' + (NOTE && PROV ? ', in due colonne separate (Note e Provvedimenti disciplinari).' : '.')]] : []),
     ['n', '* Foglio RIEPILOGO: una gara per riga (numero, girone, giornata, fase, squadre, data, ora, campo, punti, esiti speciali come i forfait, FC = squadra A, B o AB fuori classifica), ricavato con formule dai calendari' + (BR.length ? ' e dai tabelloni' : '') + '.'],
     ['n', '* Le formule usano solo intervalli di celle espliciti, senza nomi definiti.'],
+    ...(ROB ? [['n', '* Riferimenti per RICERCA (numero di gara): nei fogli Calendario si possono spostare, copiare, aggiungere o cancellare gare; classifiche (foglio Dati), RIEPILOGO, Calendario.ics e Designazioni trovano ogni gara dal numero in colonna A, che e\' un valore fisso. Una gara aggiunta deve avere un numero nuovo, da ' + (SPN + 1) + ' a ' + (SPN + SP) + ' (i numeri ripetuti nello stesso foglio sono in rosso); la giornata si legge dalla barra GIORNATA sopra la gara. Un foglio calendario nuovo non viene visto: per aggiungere gironi rigenerare il file dal generatore.'],
+      ['n', '="Controllo: gare nei calendari "&(' + CALS.map(n => 'COUNT(' + qS(n) + '$A:$A)').join('+') + ')&", gare contate in classifica "&COUNT(Dati!$S$2:$S$' + DATI_LAST + ')&IF((' + CALS.map(n => 'COUNT(' + qS(n) + '$A:$A)').join('+') + ')<>COUNT(Dati!$S$2:$S$' + DATI_LAST + '),"  -  ATTENZIONE: controllare i numeri di gara (ripetuti, mancanti o oltre ' + (SPN + SP) + ')","  -  OK")']]
+      : [['n', '* Riferimenti FISSI (versione piu\' leggera): classifiche, RIEPILOGO, Calendario.ics e Designazioni puntano a celle precise dei calendari. Non spostare, copiare o aggiungere gare a mano (non verrebbero contate): per cambiare la struttura rigenerare il file dal generatore.']]),
     ...(opt.data && opt.data.origine ? [['n', '* Dati importati da: ' + opt.data.origine + '.']] : []),
     ['n', '* Creato con il Generatore Campionato Baskin di Daniele Lolli (UncleDan), https://github.com/UncleDan/classifica-basket-baskin-excel - codice MIT, modelli CC BY 4.0. Il file con i tuoi dati e\' tuo: questa riga e\' gradita ma si puo\' togliere.']
   ];
@@ -1668,7 +1755,8 @@ function extract(M, opts) {
       const R = des.cells.get(g.row) || new Map();
       const ar = [13, 14, 15].map(c => str(R.get(c))), uc = [16, 17, 18].map(c => str(R.get(c)));
       if (!ar.some(Boolean) && !uc.some(Boolean)) return;
-      const tgt = (typeof g.num === 'number' && byNum.has(g.num)) ? byNum.get(g.num) : seq[i];
+      const num = typeof g.num === 'number' ? g.num : (typeof R.get(20) === 'number' ? R.get(20) : null);   // file con ricerche: numero di gara anche in colonna T
+      const tgt = (num !== null && byNum.has(num)) ? byNum.get(num) : seq[i];
       if (tgt) { tgt.ar = ar; tgt.uc = uc; desN++; } else desSkip++;
     });
   }
@@ -1882,7 +1970,7 @@ const $ = id => document.getElementById(id);
 // ---------- valori iniziali (anche dopo Reset; il browser non deve riproporre valori vecchi) ----------
 const DEF = { gironi: 'Gold, 10, gold', cfg: ['Campionato Baskin', '', '', 'A', '2026/2027', '3', '1', '0', '40-0', 'Gold'].join('\n'), uni: '', po: '8', poq: '8', pog: '', pp: '0', ppq: '', narb: '', nudc: '', teams: '', fields: '', fc: '' };
 let UCL_AUTO = '';
-function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('ucl').value = UCL_AUTO = allG(); $('warn').textContent = ''; }
+function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('pos').checked = false; $('ucl').value = UCL_AUTO = allG(); $('warn').textContent = ''; }
 setDefaults();
 function preview() {
   const { gironi, err } = GEN.parseGironi($('gironi').value); const S = GEN.sigle(gironi); let h = '';
@@ -2071,7 +2159,7 @@ $('go').addEventListener('click', async () => {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
     if (gironiSync()) snapAll(); else onTeams();
-    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), ucl: $('ucl').value.trim(), note: $('note').checked, prov: $('prov').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked };
+    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), ucl: $('ucl').value.trim(), note: $('note').checked, prov: $('prov').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked, pos: $('pos').checked };
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err, ...GEN.applyFC($('fc').value, T.rows)].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
