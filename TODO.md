@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.30) sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.31) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 
@@ -67,6 +67,8 @@ Squadre riconosciute in automatico come **fuori classifica** (risultati in calen
 - [x] **3.13 Playoff con andata e ritorno** (differenza canestri, parità decisa a mano, finali in gara unica): fatto nella Release 1.19.
 - [x] **3.14 Classifiche raggruppate** come i calendari (default tutte in un foglio, vuoto = una per girone accanto al calendario): fatto nella Release 1.20.
 - [x] **3.15 File robusto per le modifiche a mano**: ricerche per numero di gara al posto dei riferimenti fissi (default), con opzione "riferimenti fissi" per i file molto grandi. Fatto nella Release 1.30.
+- [x] **3.16 Provvedimenti in una cartella di lavoro a parte**, ripresi nel RIEPILOGO (Excel con il file aperto, Google Sheets con IMPORTRANGE). Fatto nella Release 1.31.
+- [ ] **3.17 Da provare sul campo**: provvedimenti a parte in Excel (con il file aperto, chiuso e riaperto) e in Google Sheets (link e consenso d'accesso); le modifiche a mano con le ricerche anche in Excel.
 
 ## 4. Altro
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.30 - 2026-10-24 10-37-16 -->
+<!-- Generatore_Campionato_Baskin.html by Daniele Lolli (UncleDan) feat. Claude AI - Release 1.31 - 2026-10-24 10-53-12 -->
 <html lang="it">
 <head>
 <meta charset="utf-8">
@@ -152,6 +152,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 28px}
 <p class="hint">Fogli con il numero di gara e una casella larga per scrivere. Quello che si scrive compare nel RIEPILOGO accanto alla gara, in due colonne separate: Note e Provvedimenti disciplinari. Il RIEPILOGO resta sempre l'ultimo foglio.</p>
 <label class="chk"><input id="note" type="checkbox" autocomplete="off"> Foglio Note</label>
 <label class="chk"><input id="prov" type="checkbox" autocomplete="off"> Foglio Provvedimenti Disciplinari</label>
+<label class="chk" style="margin-left:24px"><input id="provx" type="checkbox" autocomplete="off"> in una cartella di lavoro a parte, non visibile a chi inserisce i risultati: si scaricano due file e il RIEPILOGO riprende i provvedimenti dal secondo (in Excel quando è aperto insieme al primo; in Google Sheets tramite il link scritto in Campionato!H3)</label>
 </section>
 <section class="card">
 <h2>Squadre (facoltativo)</h2>
@@ -192,7 +193,7 @@ footer{max-width:1100px;margin:0 auto;padding:0 16px 28px}
 </ul>
 </div>
 </section>
-<p class="rev">Generatore Campionato Baskin · Release 1.30 del 2026-10-24 10-37-16 · © 2026 Daniele Lolli (UncleDan) feat. Claude AI · <a href="https://github.com/UncleDan/classifica-basket-baskin-excel" target="_blank" rel="noopener">GitHub</a> · licenza MIT (codice) e CC BY 4.0 (modelli)</p>
+<p class="rev">Generatore Campionato Baskin · Release 1.31 del 2026-10-24 10-53-12 · © 2026 Daniele Lolli (UncleDan) feat. Claude AI · <a href="https://github.com/UncleDan/classifica-basket-baskin-excel" target="_blank" rel="noopener">GitHub</a> · licenza MIT (codice) e CC BY 4.0 (modelli)</p>
 </footer>
 <div id="gofab"><button type="button" onclick="document.getElementById('go').click()">Genera xlsx</button></div>
 <script>
@@ -854,6 +855,11 @@ async function generate(opt) {
 
   // ===== NOTE e PROVVEDIMENTI DISCIPLINARI (facoltativi): numero di gara + testo libero =====
   const NOTE = !!C.note && C.note !== '0', PROV = !!C.prov && C.prov !== '0';
+  // provvedimenti in una cartella di lavoro a parte (non visibile a chi inserisce i risultati), ripresi nel RIEPILOGO
+  const PROVX = PROV && !!C.provx && C.provx !== '0' && C.provx !== 'false';
+  const cleanF = x => String(x == null ? '' : x).replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
+  const BASEF = cleanF([par[2], par[6]].map(x => String(x == null ? '' : x).trim()).filter(Boolean).join(' '));
+  const PFILE = (BASEF || 'Campionato_Baskin_' + (NTS.every(n => n === NTS[0]) ? G + 'x' + NTS[0] : G + 'gironi_' + TOTT + 'squadre') + '_MODELLO') + ' - Provvedimenti.xlsx';
   const NGAMES = GTOT + BR.reduce((a, B) => a + B.ngames, 0), NXR = Math.max(NGAMES, 20) + 1;
   const XSH = {};
   for (const [on, nm, title] of [[NOTE, 'Note', 'Note'], [PROV, 'Provvedimenti Disciplinari', 'Provvedimenti disciplinari']]) {
@@ -869,7 +875,25 @@ async function generate(opt) {
   // testo per il RIEPILOGO: (note) seguite dai provvedimenti
   const xlook = (nm, r) => { const R = "'" + nm + "'!$"; return 'INDEX(' + R + 'B$2:$B$' + NXR + ',MATCH($A' + r + ',' + R + 'A$2:$A$' + NXR + ',0))'; };
   const xnote = r => 'IFERROR(' + xlook('Note', r) + '&"","")';
-  const xprov = r => 'IFERROR(' + xlook('Provvedimenti Disciplinari', r) + '&"","")';
+  // file a parte: in Excel con INDIRETTO sul file aperto (nome in Campionato!H4), in Google Sheets dal foglio Collegamento Provvedimenti (IMPORTRANGE)
+  const XREF = c => 'INDIRECT("\'["&Campionato!$H$4&"]Provvedimenti Disciplinari\'!$' + c + '$2:$' + c + '$' + NXR + '")';
+  const xprov = r => PROVX
+    ? 'IFERROR(INDEX(' + XREF('B') + ',MATCH($A' + r + ',' + XREF('A') + ',0))&"",IFERROR(VLOOKUP($A' + r + ',\'Collegamento Provvedimenti\'!$A$3:$B$' + (NXR + 1) + ',2,FALSE)&"",""))'
+    : 'IFERROR(' + xlook('Provvedimenti Disciplinari', r) + '&"","")';
+  if (PROVX) {
+    log('Collegamento Provvedimenti');
+    const lw = mk('Collegamento Provvedimenti', 'Calendario.ics'); lw.tab = '757575';
+    lw.cols = '<cols><col width="9" customWidth="1" min="1" max="1"/><col width="120" customWidth="1" min="2" max="2"/></cols>';
+    setv(lw.cell(1, 1), 'Solo per Google Sheets: caricare anche il file "' + PFILE + '" su Google Drive, scriverne il link in Campionato!H3 e, la prima volta, cliccare su "Consenti l\'accesso" nella cella A3. In Excel questo foglio non serve: i provvedimenti si leggono dal file aperto insieme a questo (in A3 compare #NOME?).');
+    lw.cell(1, 1).s = st.top(225); lw.merge('A1:B1'); lw.row(1).ht = 48;
+    [['Gara N.', 1], ['Provvedimenti disciplinari (dal file a parte)', 2]].forEach(([h, c]) => { const x = lw.cell(2, c); x.s = 3; setv(x, h); });
+    lw.set(3, 1, '=IMPORTRANGE(Campionato!$H$3,"\'Provvedimenti Disciplinari\'!A2:B' + NXR + '")');
+    // parametri del file a parte nel foglio Campionato (F2:H4)
+    const lab = ws.cell(2, 2).s, val = ws.cell(3, 4).s;
+    [['File provvedimenti', 2, ''], ['Link Google Sheets', 3, ''], ['File cercato', 4, '=IF(TRIM($H$2)<>"",IF(ISNUMBER(SEARCH(".xls",$H$2)),TRIM($H$2),TRIM($H$2)&".xlsx"),IFERROR(SUBSTITUTE(MID(CELL("filename",$A$1),FIND("[",CELL("filename",$A$1))+1,FIND("]",CELL("filename",$A$1))-FIND("[",CELL("filename",$A$1))-1),".xlsx"," - Provvedimenti.xlsx"),"' + PFILE.replace(/"/g, '""') + '"))']].forEach(([t, r, v]) => {
+      const a = ws.cell(r, 6); a.s = lab; setv(a, t); ws.cell(r, 7).s = lab; ws.merge('F' + r + ':G' + r);
+      const b = ws.cell(r, 8); b.s = val; if (v) setv(b, v); });
+  }
 
   // ===== RIEPILOGO: una gara per riga, solo formule =====
   log('RIEPILOGO');
@@ -1210,6 +1234,7 @@ async function generate(opt) {
     ['n', '* Nomi dei gironi per la stampa: cella D11 del foglio Campionato (' + names.map((x, i) => x || LET[i]).join(', ') + ').'],
     ['n', '* Loghi: link pubblici alle immagini nelle celle D3 e D4 del foglio Campionato (funzione IMAGE: Google Sheets ed Excel 365). Le immagini sono collegate, non incorporate: si scaricano dal sito che le ospita a ogni apertura. Marchi e loghi (Baskin, EISI, societa\', enti, sponsor) appartengono ai rispettivi titolari: usarli solo se se ne ha il diritto.'],
     ['n', '* Colori dei gironi: ' + LET.map((L, i) => L + ' ' + cols[i]).join(', ') + '.'],
+    ...(PROVX ? [['n', '* Provvedimenti disciplinari in una cartella di lavoro a parte ("' + PFILE + '", stesso nome di questo file seguito da " - Provvedimenti"; un altro nome si scrive in Campionato!H2). Excel: il RIEPILOGO li mostra quando il file dei provvedimenti e\' aperto insieme a questo (in qualunque cartella); se il file manca la colonna resta vuota e torna a riempirsi appena lo si riapre. Google Sheets: caricare anche il file dei provvedimenti, scriverne il link in Campionato!H3 e consentire l\'accesso nel foglio Collegamento Provvedimenti.']] : []),
     ...((NOTE || PROV) ? [['n', '* ' + [NOTE ? 'Foglio Note' : '', PROV ? 'foglio Provvedimenti Disciplinari' : ''].filter(Boolean).join(' e ') + ': numero di gara in colonna A e testo libero in colonna B (una riga per gara); il testo compare nel RIEPILOGO' + (NOTE && PROV ? ', in due colonne separate (Note e Provvedimenti disciplinari).' : '.')]] : []),
     ['n', '* Foglio RIEPILOGO: una gara per riga (numero, girone, giornata, fase, squadre, data, ora, campo, punti, esiti speciali come i forfait, FC = squadra A, B o AB fuori classifica), ricavato con formule dai calendari' + (BR.length ? ' e dai tabelloni' : '') + '.'],
     ['n', '* Le formule usano solo intervalli di celle espliciti, senza nomi definiti.'],
@@ -1229,42 +1254,47 @@ async function generate(opt) {
   // classifiche separate subito dopo il calendario del loro ultimo girone; quella con tutti i gironi dopo i playoff
   const order = ['Campionato', ...CSH.flatMap(c => [c.name, ...CLS.filter(g => g.after === c.name).map(g => g.name)]), ...BR.map(B => B.sheet), ...CLS.filter(g => g.all).map(g => g.name), 'Classifica Finale', 'Designazioni', 'Arbitri', 'UdC', 'MEMO', 'Calendario.ics', 'Note', 'Provvedimenti Disciplinari', 'Dati', 'RIEPILOGO'];
   // senza arbitri e Ufficiali di Campo il foglio Designazioni non serve
-  const list = order.filter(nm => nm !== 'Designazioni' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
+  const list = order.map(nm => PROVX && nm === 'Provvedimenti Disciplinari' ? 'Collegamento Provvedimenti' : nm).filter(nm => nm !== 'Designazioni' || NARB || NUDC).map(nm => sheets.find(s => s.name === nm)).filter(Boolean);
   for (const sh of list) for (const Rw of sh.rows.values()) for (const x of Rw.cells.values()) if (x.k === 'f' && /DESIGNAZIONI/.test(x.v)) x.v = x.v.replace(/'?DESIGNAZIONI'?!/g, 'Designazioni!');
   log('Scrittura del file');
-  const files = [];
-  const ct = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'];
-  list.forEach((s, i) => ct.push('<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'));
-  ct.push('<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>');
-  files.push(['[Content_Types].xml', ct.join('')]);
-  files.push(['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>']);
-  const iso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
-  files.push(['docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>' + esc(par[2]) + '</dc:title><dc:creator>Generatore Campionato Baskin</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:modified></cp:coreProperties>']);
-  files.push(['docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>']);
-  let wb = BP.wbpre + '<sheets>';
-  list.forEach((s, i) => wb += '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="' + esc(s.name) + '" sheetId="' + (i + 1) + '" state="' + (s.hidden ? 'hidden' : 'visible') + '" r:id="rId' + (i + 1) + '"/>');
-  wb += '</sheets><definedNames>';
-  list.forEach((s, i) => {
-    const tname = Object.keys(S).find(k => S[k] === s.tpl);
-    if (BP.titles[tname]) wb += '<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">\'' + esc(s.name) + '\'!' + BP.titles[tname] + '</definedName>';
-    if (s.printArea) { const [a, b] = s.printArea.split(':'); const ab = x => x.replace(/^([A-Z]+)(\d+)$/, '$$$1$$$2'); wb += '<definedName name="_xlnm.Print_Area" localSheetId="' + i + '">\'' + esc(s.name) + '\'!' + ab(a) + ':' + ab(b) + '</definedName>'; }
-  });
-  wb += '</definedNames>' + BP.calcPr + '</workbook>';
-  files.push(['xl/workbook.xml', wb]);
-  let rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
-  list.forEach((s, i) => rels += '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet' + (i + 1) + '.xml" Id="rId' + (i + 1) + '"/>');
-  rels += '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="/xl/styles.xml" Id="rId' + (list.length + 1) + '"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="/xl/theme/theme1.xml" Id="rId' + (list.length + 2) + '"/></Relationships>';
-  files.push(['xl/_rels/workbook.xml.rels', rels]);
-  list.forEach((s, i) => files.push(['xl/worksheets/sheet' + (i + 1) + '.xml', serialize(s)]));
-  files.push(['xl/theme/theme1.xml', BP.theme]);
-  files.push(['xl/styles.xml', st.toXml()]);
-  const bytes = await zip(files);
+  // pacchetto xlsx di un elenco di fogli (file principale e, se richiesto, file a parte dei provvedimenti)
+  const pack = async list => {
+    const files = [];
+    const ct = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'];
+    list.forEach((s, i) => ct.push('<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'));
+    ct.push('<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>');
+    files.push(['[Content_Types].xml', ct.join('')]);
+    files.push(['_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>']);
+    const iso = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+    files.push(['docProps/core.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>' + esc(par[2]) + '</dc:title><dc:creator>Generatore Campionato Baskin</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">' + iso + '</dcterms:modified></cp:coreProperties>']);
+    files.push(['docProps/app.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Microsoft Excel</Application></Properties>']);
+    let wb = BP.wbpre + '<sheets>';
+    list.forEach((s, i) => wb += '<sheet xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="' + esc(s.name) + '" sheetId="' + (i + 1) + '" state="' + (s.hidden ? 'hidden' : 'visible') + '" r:id="rId' + (i + 1) + '"/>');
+    wb += '</sheets><definedNames>';
+    list.forEach((s, i) => {
+      const tname = Object.keys(S).find(k => S[k] === s.tpl);
+      if (BP.titles[tname]) wb += '<definedName name="_xlnm.Print_Titles" localSheetId="' + i + '">\'' + esc(s.name) + '\'!' + BP.titles[tname] + '</definedName>';
+      if (s.printArea) { const [a, b] = s.printArea.split(':'); const ab = x => x.replace(/^([A-Z]+)(\d+)$/, '$$$1$$$2'); wb += '<definedName name="_xlnm.Print_Area" localSheetId="' + i + '">\'' + esc(s.name) + '\'!' + ab(a) + ':' + ab(b) + '</definedName>'; }
+    });
+    wb += '</definedNames>' + BP.calcPr + '</workbook>';
+    files.push(['xl/workbook.xml', wb]);
+    let rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">';
+    list.forEach((s, i) => rels += '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="/xl/worksheets/sheet' + (i + 1) + '.xml" Id="rId' + (i + 1) + '"/>');
+    rels += '<Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="/xl/styles.xml" Id="rId' + (list.length + 1) + '"/><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="/xl/theme/theme1.xml" Id="rId' + (list.length + 2) + '"/></Relationships>';
+    files.push(['xl/_rels/workbook.xml.rels', rels]);
+    list.forEach((s, i) => files.push(['xl/worksheets/sheet' + (i + 1) + '.xml', serialize(s)]));
+    files.push(['xl/theme/theme1.xml', BP.theme]);
+    files.push(['xl/styles.xml', st.toXml()]);
+    return zip(files);
+  };
+  const bytes = await pack(list);
+  const bytes2 = PROVX ? await pack([XSH['Provvedimenti Disciplinari']]) : null;   // cartella di lavoro a parte con i soli provvedimenti
   const same = NTS.every(n => n === NTS[0]);
   // nome file: Campionato + Stagione (caratteri non validi -> "_"); se mancano, nome con le dimensioni
   const clean = x => String(x == null ? '' : x).replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/\s+/g, ' ').trim().replace(/[. ]+$/, '');
   const base = clean([par[2], par[6]].map(x => String(x == null ? '' : x).trim()).filter(Boolean).join(' '));
   const fname = base ? base + '.xlsx' : 'Campionato_Baskin_' + (same ? G + 'x' + NTS[0] : G + 'gironi_' + TOTT + 'squadre') + '_MODELLO.xlsx';
-  return { bytes, fname, info: { G, NTS, TOTT, GTOT, PO, POQ, POG, PP, PPQ, sheets: list.length, imp } };
+  return { bytes, fname, bytes2, fname2: PROVX ? PFILE : null, info: { G, NTS, TOTT, GTOT, PO, POQ, POG, PP, PPQ, sheets: list.length, imp } };
 }
 
 function parseGironi(text) {
@@ -1745,7 +1775,7 @@ function extract(M, opts) {
   // note scritte nella riga del campo (senza codice campo): vanno nel foglio Note
   const vNotes = righe.filter(o => o.t === 'gara' && o.nota).length;
   for (const [nm, key] of [['Note', 'nota'], ['Provvedimenti Disciplinari', 'prov']]) {
-    const sh = S[nm]; if (!sh) continue; xn[key].sheet = true;
+    const sh = S[nm] || (key === 'prov' ? opts.provSheet : null); if (!sh) continue; xn[key].sheet = true;   // provvedimenti anche da una cartella di lavoro a parte
     for (let r = 2; r <= sh.maxRow; r++) { const num = get(sh, r, 1), txt = str(get(sh, r, 2)); if (!txt) continue; const tgt = typeof num === 'number' ? byNum.get(num) : null; if (tgt) { tgt[key] = tgt[key] ? tgt[key] + ' ' + txt : txt; xn[key][0]++; } else xn[key][1]++; }
   }
   if (des) {
@@ -1889,7 +1919,7 @@ function extract(M, opts) {
     }
     params[3] = gironi.map(g => g.sigla).join(','); params[9] = gironi.map(g => g.name).join(',');
   }
-  return { tipo, gironi, params, po, pp, narb, nudc, warn, ucl, note: !!xn.nota.sheet || vNotes > 0, prov: !!xn.prov.sheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
+  return { tipo, gironi, params, po, pp, narb, nudc, warn, ucl, note: !!xn.nota.sheet || vNotes > 0, prov: !!xn.prov.sheet || !!S['Collegamento Provvedimenti'], provx: !!S['Collegamento Provvedimenti'] || !!opts.provSheet, uni: uni.join('\n'), data: { origine: tipo, righe }, report };
 }
 
 // ---------------- fusione di piu' file ----------------
@@ -1936,7 +1966,7 @@ function merge(list) {
   params[3] = LET.join(','); params[9] = gironi.map(g => g.name).join(',');
   report.unshift('Fusione di ' + list.length + ' file: ' + gironi.length + ' gironi in totale. Parametri presi dal primo file; il playoff si imposta nella scheda Playoff.');
   if (warn.length) report.push('Attenzione: ' + warn.join('; ') + '.');
-  return { tipo: 'Fusione di ' + list.length + ' file', gironi, params, po: { squadre: 0, qualificate: '', gironi: '' }, pp: { squadre: 0, qualificate: '' }, narb: i, nudc: u, warn: list.flatMap(X => (X.warn || []).map(w => X.file + ': ' + w)), note: list.some(X => X.note), prov: list.some(X => X.prov), uni: uni.join('\n'), data: { origine: 'fusione di ' + list.map(X => X.file).join(', '), righe }, report };
+  return { tipo: 'Fusione di ' + list.length + ' file', gironi, params, po: { squadre: 0, qualificate: '', gironi: '' }, pp: { squadre: 0, qualificate: '' }, narb: i, nudc: u, warn: list.flatMap(X => (X.warn || []).map(w => X.file + ': ' + w)), note: list.some(X => X.note), prov: list.some(X => X.prov), provx: list.some(X => X.provx), uni: uni.join('\n'), data: { origine: 'fusione di ' + list.map(X => X.file).join(', '), righe }, report };
 }
 
 // ---------------- riassegnazione dei gironi importati ----------------
@@ -1970,7 +2000,7 @@ const $ = id => document.getElementById(id);
 // ---------- valori iniziali (anche dopo Reset; il browser non deve riproporre valori vecchi) ----------
 const DEF = { gironi: 'Gold, 10, gold', cfg: ['Campionato Baskin', '', '', 'A', '2026/2027', '3', '1', '0', '40-0', 'Gold'].join('\n'), uni: '', po: '8', poq: '8', pog: '', pp: '0', ppq: '', narb: '', nudc: '', teams: '', fields: '', fc: '' };
 let UCL_AUTO = '';
-function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('pos').checked = false; $('ucl').value = UCL_AUTO = allG(); $('warn').textContent = ''; }
+function setDefaults() { for (const k in DEF) $(k).value = DEF[k]; $('note').checked = false; $('prov').checked = false; $('orig').checked = true; $('ar').checked = false; $('par').checked = false; $('pos').checked = false; $('provx').checked = false; $('ucl').value = UCL_AUTO = allG(); $('warn').textContent = ''; }
 setDefaults();
 function preview() {
   const { gironi, err } = GEN.parseGironi($('gironi').value); const S = GEN.sigle(gironi); let h = '';
@@ -2104,9 +2134,12 @@ async function importa() {
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('Il browser non supporta DecompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const list = [], vuoti = [], errs = [];
-    for (const f of FILES) {
+    // cartella di lavoro dei soli provvedimenti (senza foglio Campionato): si unisce al calendario caricato insieme
+    const MS = [], provF = [];
+    for (const f of FILES) { const M = await XL.read(await f.arrayBuffer()); if (!M.sheets['Campionato'] && M.sheets['Provvedimenti Disciplinari']) provF.push(M.sheets['Provvedimenti Disciplinari']); else MS.push([f, M]); }
+    for (const [f, M] of MS) {
       rep.textContent = 'Lettura di ' + f.name + '...';
-      try { const X = XL.extract(await XL.read(await f.arrayBuffer()), { split: $('split').checked }); X.file = f.name; list.push(X); }
+      try { const X = XL.extract(M, { split: $('split').checked, provSheet: provF[0] }); X.file = f.name; list.push(X); }
       catch (e) { if (e.code === 'VUOTO') { vuoti.push(f.name); continue; } errs.push(f.name + ': ' + e.message); }
     }
     if (errs.length) throw new Error(errs.length > 1 ? errs.length + ' file non importabili (da correggere prima di procedere):\n- ' + errs.join('\n- ') : errs[0]);
@@ -2118,7 +2151,7 @@ async function importa() {
     $('cfg').value = X.params.join('\n');
     $('po').value = String(X.po.squadre || 0); $('poq').value = X.po.qualificate || ''; $('pog').value = X.po.gironi || '';
     $('narb').value = X.narb || ''; $('nudc').value = X.nudc || ''; $('uni').value = (X.uni || '').split('\n').filter(Boolean).join('; ');
-    $('note').checked = !!X.note; $('prov').checked = !!X.prov;
+    $('note').checked = !!X.note; $('prov').checked = !!X.prov; $('provx').checked = !!X.provx;
     $('pp').value = String((X.pp && X.pp.squadre) || 0); $('ppq').value = (X.pp && X.pp.qualificate) || '';
     const tsv = a => a.map(x => (x === undefined || x === null ? '' : String(x)).replace(/[\t\r\n]+/g, ' ')).join('\t');
     const sq = X.data.righe.filter(o => o.t === 'sq'), cp = X.data.righe.filter(o => o.t === 'campo');
@@ -2159,7 +2192,7 @@ $('go').addEventListener('click', async () => {
     if (typeof CompressionStream === 'undefined') throw new Error('Il browser non supporta CompressionStream: usare una versione recente di Chrome, Edge, Firefox o Safari.');
     const { gironi, err } = GEN.parseGironi($('gironi').value); if (err.length) throw new Error(err.join(' '));
     if (gironiSync()) snapAll(); else onTeams();
-    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), ucl: $('ucl').value.trim(), note: $('note').checked, prov: $('prov').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked, pos: $('pos').checked };
+    const cfg = { po: $('po').value, poq: $('poq').value, pog: $('pog').value.trim(), pp: $('pp').value, ppq: $('ppq').value, narb: $('narb').value.trim(), nudc: $('nudc').value.trim(), uni: $('uni').value.trim(), ucl: $('ucl').value.trim(), note: $('note').checked, prov: $('prov').checked, provx: $('prov').checked && $('provx').checked, orig: $('orig').checked, ar: $('ar').checked, par: $('par').checked, pos: $('pos').checked };
     const T = GEN.parseTeams($('teams').value), F = GEN.parseFields($('fields').value);
     [...T.err, ...F.err, ...GEN.applyFC($('fc').value, T.rows)].forEach(w => say('Attenzione: ' + w, 'err'));
     const BX = GEN.boxRecords(T.rows, F.rows, gironi); BX.warn.forEach(w => say('Attenzione: ' + w, 'err'));
@@ -2176,12 +2209,14 @@ $('go').addEventListener('click', async () => {
     if (IMPORTED || BX.recs.length) DATA = { origine: IMPORTED ? IMPORTED.origine : 'caselle Squadre e Campi', righe: [...IR, ...BX.recs] };
     const t0 = performance.now();
     const r = await GEN.generate({ blueprint: BLUEPRINT, gironi, params: GEN.parseParams($('cfg').value), cfg, data: DATA });
-    const url = URL.createObjectURL(new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-    const a = document.createElement('a'); a.href = url; a.download = r.fname; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    const down = (bytes, name) => { const url = URL.createObjectURL(new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000); };
+    down(r.bytes, r.fname);
+    if (r.bytes2) { await new Promise(res => setTimeout(res, 400)); down(r.bytes2, r.fname2); }
     const i = r.info;
     say('Creato ' + r.fname + ' (' + (r.bytes.length / 1024).toFixed(0) + ' KB, ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s): ' + i.G + ' giron' + (i.G > 1 ? 'i' : 'e') + ', ' + i.TOTT + ' squadre, ' + i.GTOT + ' gare di girone' + (i.PO ? ', playoff a ' + i.PO : ', nessun playoff') + (i.PP ? ', Torneo Primavera a ' + i.PP : '') + ', ' + i.sheets + ' fogli.', 'ok');
     if (DATA) say('Dati inseriti: ' + i.imp.ok + ' elementi' + (i.imp.skip ? '; ' + i.imp.skip + ' non hanno trovato posto nel nuovo modello (gironi o squadre in meno).' : '.'), i.imp.skip ? 'err' : 'ok');
+    if (r.bytes2) say('Creato anche ' + r.fname2 + ' con i soli provvedimenti disciplinari: tenerlo con lo stesso nome (o scriverne il nome in Campionato!H2) e aprirlo insieme al calendario per vederli nel RIEPILOGO. Se il browser chiede di consentire download multipli, accettare.', 'ok');
     say('Il file si calcola alla prima apertura in Excel, LibreOffice o Google Sheets.');
   } catch (e) { say('Errore: ' + e.message, 'err'); console.error(e); }
   $('go').disabled = false;
