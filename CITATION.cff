@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Se usi o riadatti questo progetto, cita l'autore così:"
+title: "Generatore Campionato Baskin (classifica-basket-baskin-excel)"
+authors:
+  - family-names: "Lolli"
+    given-names: "Daniele"
+    alias: "UncleDan"
+repository-code: "https://github.com/UncleDan/classifica-basket-baskin-excel"
+license: MIT
+type: software

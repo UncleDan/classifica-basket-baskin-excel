@@ -1,6 +1,6 @@
 # TODO
 
-Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.26) sui file 2023/2024, 2024/2025 e 2025/2026.
+Elenco delle cose da correggere a mano nei file delle stagioni passate prima di importarli nel generatore, e delle funzioni del generatore ancora da fare. Stato verificato con il generatore Release 1.14 (aggiornato alla 1.29) sui file 2023/2024, 2024/2025 e 2025/2026.
 
 ## 1. Da correggere a mano nei file di origine (prima di importare)
 

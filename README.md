@@ -69,6 +69,7 @@ Il generatore si può usare anche online: l'azione GitHub `.github/workflows/pag
 * **Note e Provvedimenti disciplinari** (facoltativi, caselle nella scheda Anagrafiche): fogli `Note` e `Provvedimenti Disciplinari`, ognuno con il numero di gara in colonna A e una casella larga per il testo in colonna B (una riga per gara), allineate in alto e con il numero di gara centrato. Quello che si scrive compare nel `RIEPILOGO` accanto alla gara, in due colonne separate (`Note` e `Provvedimenti disciplinari`); i due fogli vengono prima del `RIEPILOGO`, che è sempre l'ultimo foglio. Importando un file che ha questi fogli, le caselle si spuntano da sole e i testi restano legati alla loro gara anche se cambia la numerazione.
 * **RIEPILOGO**: il generatore aggiunge in fondo, come ultimo foglio (anche dopo `Note` e `Provvedimenti Disciplinari`), il foglio `RIEPILOGO`, senza formattazione e tutto a formule (si aggiorna da solo): una gara per riga con numero di gara, lettera e nome del girone, giornata, fase, squadre, data, ora, nome del campo, punti delle due squadre, **Esiti Speciali** ("Forfait Squadra A" o "Forfait Squadra B", altrimenti vuoto) e **FC** (A, B o AB se è fuori classifica la prima squadra, la seconda o entrambe, altrimenti vuoto). Prima riga con le descrizioni in grassetto; poi le gare di andata in ordine di lettera del girone e di giornata (il modello prevede solo l'andata), poi il playoff dal primo turno alle finali e, se c'è, il Torneo Primavera nello stesso ordine.
 * **Calendario.ics**: titolo breve di ogni evento con il numero di gara, es. `G1: Squadra 1 vs Squadra 2`; il girone o il turno di playoff (es. `[Girone O]`, `[Playoff a 8 - Quarti]`) è nella descrizione, dopo nome e stagione del campionato.
+* **Privacy e uso da cellulare**: tutto avviene nel browser, senza richieste in rete né dati salvati (niente cookie, localStorage o IndexedDB); resta solo il file xlsx scaricato. Le avvertenze complete sono in fondo alla pagina, con la revisione del generatore. Su schermi piccoli la pagina va su una colonna, con caselle più grandi, il pulsante "Scegli i file xlsx" al posto del trascinamento e il pulsante "Genera xlsx" sempre in basso.
 * Il file prodotto si chiama come il campionato seguito dalla stagione (parametri 1 e 5, per esempio `Campionato Baskin Senior EISI Veneto 2026_2027.xlsx`), con `_` al posto dei caratteri non validi nei nomi di file come `/`; se i due parametri sono vuoti si chiama `Campionato_Baskin_<gironi>x<squadre>_MODELLO.xlsx` (oppure `Campionato_Baskin_<gironi>gironi_<squadre>squadre_MODELLO.xlsx` se i gironi hanno dimensioni diverse). Il file ha la stessa struttura delle versioni qui sopra: fogli, formule, colori, convalide, formattazione condizionale, solo intervalli di celle. Il generatore parte dalla versione 1 × 10, contenuta nella pagina stessa; il file si calcola alla prima apertura in Excel, LibreOffice o Google Sheets.
 
 ### 1 girone da 10 squadre (10 squadre)
@@ -234,10 +235,27 @@ Se invece si aggiunge la colonna **in coda** al blocco, vanno corretti a mano gl
 4. Aggiungere il blocco corrispondente nel foglio `Classifica`.
 5. I tabelloni restano quelli predisposti: per cambiarli va rifatto il foglio playoff, dove gli accoppiamenti del primo turno sono scritti come codici posizione (`A1`, `B4`, ...) nelle colonne `C` ed `E`.
 
-Addattamento al **Basket**/**Baskin** di:
 ## Da fare
 
 L'elenco delle cose da correggere a mano nei file delle stagioni passate e delle funzioni ancora da fare è in [`TODO.md`](TODO.md).
+
+## Licenza
+
+Il progetto è aperto: si può usare, copiare, modificare e ridistribuire, anche a scopo commerciale, **a condizione di citare l'autore**.
+
+* **Codice** (`Generatore_Campionato_Baskin.html`, script e workflow): licenza [MIT](LICENSE).
+* **Modelli Excel e testi** (`Campionato_Baskin_*.xlsx`, `README.md`, `TODO.md`): licenza [Creative Commons Attribuzione 4.0 (CC BY 4.0)](LICENSE-CC-BY-4.0.md).
+* Citazione suggerita: *Basato su "Generatore Campionato Baskin" di Daniele Lolli (UncleDan), https://github.com/UncleDan/classifica-basket-baskin-excel* (vedi anche [`CITATION.cff`](CITATION.cff)).
+* I file prodotti con i propri dati appartengono a chi li crea; la riga di citazione nel foglio `MEMO` è gradita ma si può togliere.
+
+## Marchi e loghi
+
+* Generatore e modelli **non contengono loghi**: le immagini compaiono solo se si scrive un link in `Campionato!D3` e `D4`.
+* Nomi e loghi **Baskin** ed **EISI** (Ente Italiano Sport Inclusivi), come quelli di società, enti, federazioni e sponsor, appartengono ai rispettivi titolari e **non sono coperti dalle licenze del progetto**: vanno usati solo se se ne ha il diritto o l'autorizzazione (per Baskin ed EISI, secondo le indicazioni di EISI) e nel rispetto delle loro linee guida grafiche.
+* I loghi sono **collegati e non incorporati (hotlink)**: Excel o Google Sheets scaricano l'immagine dal sito che la ospita a ogni apertura del file. Quel sito può quindi registrare gli accessi, e se l'immagine viene spostata, cambiata o protetta il logo sparisce o cambia. Meglio usare link a immagini pubblicate dal titolare o con il suo consenso, su un sito stabile.
+* Questo è un progetto personale, **non un prodotto ufficiale di EISI** né di altri enti; il riferimento a Baskin ed EISI serve solo a indicare la disciplina e l'ente per cui i modelli sono pensati.
+
+Adattamento al **Basket**/**Baskin** di:
 
 ## Daniele Lolli (aka UncleDan)
 
